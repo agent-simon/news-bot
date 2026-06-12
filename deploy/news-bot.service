@@ -22,6 +22,10 @@ StartLimitBurst=5
 [Service]
 Type=simple
 User=sam
+# Unbuffer Python stdout/stderr so print() output reaches the journal in real
+# time (otherwise it block-buffers when stdout isn't a terminal, and
+# `journalctl -f` shows nothing until the buffer flushes).
+Environment=PYTHONUNBUFFERED=1
 # WorkingDirectory is load-bearing: seen_links.db / seen_links.json and the .env
 # file are all resolved relative to it. Point it at the repo checkout.
 WorkingDirectory=/home/sam/work/news-bot
