@@ -71,8 +71,11 @@ def search_new_items():
     messages = [{
         "role": "user",
         "content": (
-            f"Search the web for news from {cutoff_str} onward about Playwright, "
-            "end-to-end testing, and AI-driven test automation.\n\n"
+            f"Search the web for news from {cutoff_str} onward about:\n"
+            "1. Playwright, end-to-end testing, and AI-driven test automation.\n"
+            "2. New model releases and major product announcements from AI labs "
+            "such as Anthropic (Claude), OpenAI (GPT/ChatGPT), Google (Gemini), "
+            "and Meta (Llama).\n\n"
             "Find up to 5 relevant articles or announcements, then respond with ONLY a "
             "JSON array (no markdown, no commentary) where each element has \"title\", "
             "\"link\" (the source URL) and \"summary\" (1-2 sentences)."
