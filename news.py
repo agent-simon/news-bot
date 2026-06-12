@@ -23,11 +23,15 @@ SUMMARY_MODEL = "claude-haiku-4-5"
 ai = Anthropic()
 
 SOURCES = [
-    {"url": "https://news.google.com/rss/search?q=playwright+e2e+testing", "limit": 10, "name": "Google News"},
-    {"url": "https://news.google.com/rss/search?q=AI+test+automation", "limit": 10, "name": "Google News"},
+    {"url": "https://news.google.com/rss/search?q=playwright+e2e+testing", "limit": 2, "name": "Google News"},
+    {"url": "https://news.google.com/rss/search?q=AI+test+automation", "limit": 2, "name": "Google News"},
     {"url": "https://github.com/microsoft/playwright/releases.atom", "limit": 1, "name": "GitHub"},
     {"url": "https://hnrss.org/newest?q=playwright", "limit": 5, "name": "Hacker News"},
     {"url": "https://hnrss.org/newest?q=Anthropic+OR+OpenAI+OR+Claude+OR+GPT+OR+Gemini+OR+Llama+OR+LLM&points=20", "limit": 2, "name": "Hacker News"},
+    {"url": "https://playwright.dev/feed.xml", "limit": 1, "name": "Playwright Blog"},
+    {"url": "https://dev.to/feed/tag/playwright", "limit": 1, "name": "Dev.to"},
+    {"url": "https://hnrss.org/newest?q=agentic+OR+%22AI+agent%22+coding&points=15", "limit": 3, "name": "Hacker News"},
+    {"url": "https://www.anthropic.com/news/rss.xml", "limit": 2, "name": "Anthropic"},
 ]
 
 KNOWN_SOURCE_NAMES = {
