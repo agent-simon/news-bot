@@ -4,6 +4,7 @@ load_dotenv()
 
 import html
 import json
+import random
 import re
 import feedparser
 from anthropic import Anthropic
@@ -34,6 +35,21 @@ KNOWN_SOURCE_NAMES = {
     "news.ycombinator.com": "Hacker News",
     "news.google.com": "Google News",
 }
+
+# Topics the on-demand /news command does a random web search across, for
+# variety run-to-run. Edit this list freely. THEMES_PER_RUN of them are picked
+# at random each time (only on /news, not the daily job).
+SEARCH_THEMES = [
+    "new AI model and product releases from Anthropic, OpenAI, Google, and Meta",
+    "AI agents and agentic developer tools",
+    "AI coding assistants and developer productivity",
+    "open-source LLMs and local model tooling",
+    "LLM evaluation, benchmarks, and red-teaming",
+    "AI in software testing and QA automation",
+    "Playwright and browser automation",
+    "retrieval-augmented generation and vector databases",
+]
+THEMES_PER_RUN = 2
 
 def _source_name(link):
     netloc = urlparse(link).netloc.lower()
@@ -94,23 +110,10 @@ def fetch_new_items():
     print(f"Total new items: {len(items)}")
     return items
 
-def search_new_items():
-    seen = load_seen()
-    cutoff_str = (datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
-
-    messages = [{
-        "role": "user",
-        "content": (
-            f"Search the web for news from {cutoff_str} onward about:\n"
-            "1. Playwright, end-to-end testing, and AI-driven test automation.\n"
-            "2. New model releases and major product announcements from AI labs "
-            "such as Anthropic (Claude), OpenAI (GPT/ChatGPT), Google (Gemini), "
-            "and Meta (Llama).\n\n"
-            "Find up to 5 relevant articles or announcements, then respond with ONLY a "
-            "JSON array (no markdown, no commentary) where each element has \"title\", "
-            "\"link\" (the source URL) and \"summary\" (1-2 sentences)."
-        )
-    }]
+def _web_search(instruction):
+    """Run a Claude web search with the given instruction and return the parsed
+    [{title, link, summary}] list, or [] if nothing usable came back."""
+    messages = [{"role": "user", "content": instruction}]
     tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
 
     response = ai.messages.create(model=SEARCH_MODEL, max_tokens=1500, tools=tools, messages=messages)
@@ -121,30 +124,74 @@ def search_new_items():
     text_blocks = [block.text for block in response.content if block.type == "text"]
     if not text_blocks:
         return []
-
     try:
-        results = _extract_json(text_blocks[-1])
+        return _extract_json(text_blocks[-1])
     except json.JSONDecodeError:
-        print("search_new_items: could not parse response as JSON")
+        print("web search: could not parse response as JSON")
         return []
 
+
+def _results_to_items(results, seen):
+    """Turn raw web-search results into item dicts, skipping already-seen links."""
     items = []
     for result in results:
         link = result.get("link")
         if not link or normalize(link) in seen:
             continue
         items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link)})
+    return items
 
+def search_new_items():
+    seen = load_seen()
+    cutoff_str = (datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
+
+    results = _web_search(
+        f"Search the web for news from {cutoff_str} onward about:\n"
+        "1. Playwright, end-to-end testing, and AI-driven test automation.\n"
+        "2. New model releases and major product announcements from AI labs "
+        "such as Anthropic (Claude), OpenAI (GPT/ChatGPT), Google (Gemini), "
+        "and Meta (Llama).\n\n"
+        "Find up to 5 relevant articles or announcements, then respond with ONLY a "
+        "JSON array (no markdown, no commentary) where each element has \"title\", "
+        "\"link\" (the source URL) and \"summary\" (1-2 sentences)."
+    )
+    items = _results_to_items(results, seen)
     print(f"Web search -> added {len(items)}")
     return items
 
+def search_themes(count=THEMES_PER_RUN):
+    """Web-search a random handful of SEARCH_THEMES for variety run-to-run."""
+    if not SEARCH_THEMES:
+        return []
+    themes = random.sample(SEARCH_THEMES, k=min(count, len(SEARCH_THEMES)))
+    seen = load_seen()
+    cutoff_str = (datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
 
-def collect_new_items():
-    """Gather candidates from RSS + web search, deduped across both by
-    normalized link. Does not persist; caller marks items seen after delivery."""
+    topics = "\n".join(f"- {t}" for t in themes)
+    results = _web_search(
+        f"Search the web for recent, noteworthy news from {cutoff_str} onward "
+        "about the following topics:\n"
+        f"{topics}\n\n"
+        "Find up to 5 relevant articles or announcements across these topics, then "
+        "respond with ONLY a JSON array (no markdown, no commentary) where each "
+        "element has \"title\", \"link\" (the source URL) and \"summary\" (1-2 sentences)."
+    )
+    items = _results_to_items(results, seen)
+    print(f"Themed search [{', '.join(themes)}] -> added {len(items)}")
+    return items
+
+
+def collect_new_items(include_themes=False):
+    """Gather candidates from RSS + web search, deduped by normalized link. Does
+    not persist; caller marks items seen after delivery. When include_themes is
+    set, also runs a random-theme web search (used by the on-demand /news)."""
+    sources = fetch_new_items() + search_new_items()
+    if include_themes:
+        sources += search_themes()
+
     items = []
     picked = set()
-    for item in fetch_new_items() + search_new_items():
+    for item in sources:
         key = normalize(item["link"])
         if key in picked:
             continue
