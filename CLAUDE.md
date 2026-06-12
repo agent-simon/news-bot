@@ -24,9 +24,9 @@ There are no automated tests or linters configured.
 ## Architecture
 
 - **bot.py** — Telegram bot entrypoint (`python-telegram-bot`). Registers the `/news` command and a daily job (`run_daily`, 08:00 server time). Both call `collect_new_items()` then `summarize()` from `news.py`, and `mark_seen()` from `dedup.py` after the message is sent. `/news` passes `include_themes=True` for the extra random-theme search; the daily job does not.
+- **sources.json** — Feed/topic config, loaded by `news.py` at import (relative to the module, so it's CWD-independent). Edit feeds and topics here. Keys: `sources` (RSS/Atom feeds: `{url, limit, name}`), `known_source_names` (host → display label for web-search results), `base_topics` (fixed topics every web search covers), `search_themes` (extra topics `/news` mixes in at random).
 - **news.py** — Core logic:
-  - `SOURCES`: list of RSS/Atom feed URLs + per-feed item limits, parsed with `feedparser`. Add/remove feeds here.
-  - `BASE_TOPICS`: the fixed topics (Playwright/testing + AI-lab releases) every web search covers. `SEARCH_THEMES` / `THEMES_PER_RUN`: extra topics the on-demand `/news` mixes in — `THEMES_PER_RUN` chosen at random per run, for variety. Edit either to change coverage.
+  - `SOURCES` / `KNOWN_SOURCE_NAMES` / `BASE_TOPICS` / `SEARCH_THEMES` are loaded from `sources.json`. `THEMES_PER_RUN` (how many themes `/news` samples per run) stays in `news.py`.
   - `fetch_new_items()`: pulls entries from each source, skips links already seen (via `dedup.load_seen()`/`normalize()`) and items older than `MAX_AGE_DAYS` (3). Read-only — does not record seen links.
   - `search_web(include_themes=False)`: a **single** web search (Claude `SEARCH_MODEL`/Sonnet, `web_search_20250305` server tool, `max_uses: 5`) covering `BASE_TOPICS` plus, when `include_themes`, a random sample of `SEARCH_THEMES`. One combined call instead of one-per-topic-group keeps token/search cost down. Routes through `_web_search()` + `_results_to_items()`; dedups against the seen set and returns the same `{title, link, summary, source}` shape as RSS items.
   - `collect_new_items(include_themes=False)`: runs `fetch_new_items() + search_web(include_themes)` and dedups across all by normalized link; the candidate list the bot summarizes and (post-send) marks seen.

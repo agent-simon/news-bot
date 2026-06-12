@@ -4,6 +4,7 @@ load_dotenv()
 
 import html
 import json
+import os
 import random
 import re
 import feedparser
@@ -22,37 +23,20 @@ SUMMARY_MODEL = "claude-haiku-4-5"
 
 ai = Anthropic()
 
-SOURCES = [
-    {"url": "https://news.google.com/rss/search?q=playwright+e2e+testing", "limit": 2, "name": "Google News"},
-    {"url": "https://news.google.com/rss/search?q=AI+test+automation", "limit": 2, "name": "Google News"},
-    {"url": "https://github.com/microsoft/playwright/releases.atom", "limit": 1, "name": "GitHub"},
-    {"url": "https://hnrss.org/newest?q=playwright", "limit": 5, "name": "Hacker News"},
-    {"url": "https://hnrss.org/newest?q=Anthropic+OR+OpenAI+OR+Claude+OR+GPT+OR+Gemini+OR+Llama+OR+LLM&points=20", "limit": 2, "name": "Hacker News"},
-    {"url": "https://playwright.dev/feed.xml", "limit": 1, "name": "Playwright Blog"},
-    {"url": "https://dev.to/feed/tag/playwright", "limit": 1, "name": "Dev.to"},
-    {"url": "https://hnrss.org/newest?q=agentic+OR+%22AI+agent%22+coding&points=15", "limit": 3, "name": "Hacker News"},
-    {"url": "https://www.anthropic.com/news/rss.xml", "limit": 2, "name": "Anthropic"},
-]
+# Feed/topic config lives in sources.json (edit feeds and topics there).
+# Loaded relative to this file so it works regardless of the process CWD.
+with open(os.path.join(os.path.dirname(__file__), "sources.json"), encoding="utf-8") as _f:
+    _config = json.load(_f)
 
-KNOWN_SOURCE_NAMES = {
-    "github.com": "GitHub",
-    "news.ycombinator.com": "Hacker News",
-    "news.google.com": "Google News",
-}
-
-# Topics the on-demand /news command does a random web search across, for
-# variety run-to-run. Edit this list freely. THEMES_PER_RUN of them are picked
-# at random each time (only on /news, not the daily job).
-SEARCH_THEMES = [
-    "new AI model and product releases from Anthropic, OpenAI, Google, and Meta",
-    "AI agents and agentic developer tools",
-    "AI coding assistants and developer productivity",
-    "open-source LLMs and local model tooling",
-    "LLM evaluation, benchmarks, and red-teaming",
-    "AI in software testing and QA automation",
-    "Playwright and browser automation",
-    "retrieval-augmented generation and vector databases",
-]
+# RSS/Atom feeds: {url, limit, name}.
+SOURCES = _config["sources"]
+# Display labels for web-search result hosts, keyed by netloc (sans www.).
+KNOWN_SOURCE_NAMES = _config["known_source_names"]
+# Fixed topics every web search covers.
+BASE_TOPICS = _config["base_topics"]
+# Extra topics the on-demand /news mixes in; THEMES_PER_RUN are picked at random
+# per run (only on /news, not the daily job).
+SEARCH_THEMES = _config["search_themes"]
 THEMES_PER_RUN = 2
 
 def _source_name(link):
@@ -144,13 +128,6 @@ def _results_to_items(results, seen):
             continue
         items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link)})
     return items
-
-# The fixed topics every web search always covers.
-BASE_TOPICS = [
-    "Playwright, end-to-end testing, and AI-driven test automation",
-    "new model releases and major product announcements from AI labs such as "
-    "Anthropic (Claude), OpenAI (GPT/ChatGPT), Google (Gemini), and Meta (Llama)",
-]
 
 def search_web(include_themes=False):
     """One web search covering the fixed BASE_TOPICS, plus (on /news) a random
