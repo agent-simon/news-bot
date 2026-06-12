@@ -34,10 +34,24 @@ def _source_name(link):
     return KNOWN_SOURCE_NAMES.get(netloc, netloc)
 
 def _extract_json(text):
-    raw = text.strip().strip("`")
-    if raw.startswith("json"):
-        raw = raw[4:].strip()
-    return json.loads(raw)
+    raw = text.strip()
+    # Strip a surrounding ```json ... ``` (or bare ```) code fence if present.
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    # The model sometimes wraps the array in prose ("Here are the items: [...]").
+    # Fall back to slicing out the outermost JSON array/object.
+    starts = [i for i in (raw.find("["), raw.find("{")) if i != -1]
+    ends = [i for i in (raw.rfind("]"), raw.rfind("}")) if i != -1]
+    if starts and ends:
+        return json.loads(raw[min(starts):max(ends) + 1])
+    raise json.JSONDecodeError("no JSON found", raw, 0)
 
 def fetch_new_items():
     seen = load_seen()
@@ -120,24 +134,50 @@ def collect_new_items():
         items.append(item)
     return items
 
+
+def _render(items, enrichments):
+    """Build the HTML Telegram message. `enrichments` maps an item index to
+    {emoji, summary}; missing entries fall back to the item's own data."""
+    entries = []
+    for idx, item in enumerate(items):
+        enr = enrichments.get(idx, {})
+        emoji = enr.get("emoji") or "🔹"
+        summary = html.escape(enr.get("summary") or item["summary"] or "")
+        title = html.escape(item["title"])
+        link = item["link"]
+        source = html.escape(item.get("source", ""))
+        if link:
+            header = f'{emoji} <a href="{html.escape(link, quote=True)}"><b>{title}</b></a>'
+        else:
+            header = f"{emoji} <b>{title}</b>"
+        if source:
+            header += f" <i>({source})</i>"
+        entries.append(f"{header}\n{summary}" if summary else header)
+
+    return f"📰 <b>{len(entries)} new item(s)</b>\n\n" + "\n\n".join(entries)
+
 def summarize(items):
     if not items:
         return "📰 No new relevant items today."
 
-    text_blob = "\n\n".join(f"Title: {i['title']}\nLink: {i['link']}\nRaw: {i['summary'][:300]}" for i in items)
+    # Ask only for emoji + summary keyed by index; title/link/source stay local.
+    # This keeps output small (avoids token-limit truncation) and removes the
+    # risk of the model mangling copied URLs.
+    text_blob = "\n\n".join(
+        f"[{idx}] Title: {i['title']}\nRaw: {i['summary'][:300]}"
+        for idx, i in enumerate(items)
+    )
     msg = ai.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1500,
+        max_tokens=4000,
         messages=[{
             "role": "user",
             "content": (
                 "For each item below, write a 1-2 sentence summary based on the title "
                 "(the raw content may be sparse) and pick one emoji that fits its topic. "
-                "Include ALL items, even if the summary field is empty — use the title to "
-                "infer relevance.\n\n"
+                "Include ALL items, even if the raw content is empty — infer from the title.\n\n"
                 "Respond with ONLY a JSON array (no markdown, no commentary), where each "
-                "element is {\"emoji\": ..., \"title\": ..., \"summary\": ..., \"link\": ...} "
-                "and \"link\" is copied exactly from the item's Link field.\n\n"
+                "element is {\"i\": <the bracketed index>, \"emoji\": ..., \"summary\": ...}.\n\n"
                 f"{text_blob}"
             )
         }]
@@ -146,23 +186,15 @@ def summarize(items):
     try:
         results = _extract_json(msg.content[0].text)
     except json.JSONDecodeError:
-        return msg.content[0].text
+        # Never leak raw model output to Telegram — render from local items.
+        print("summarize: could not parse response as JSON; using raw items")
+        return _render(items, {})
 
-    source_by_link = {i["link"]: i["source"] for i in items}
-
-    entries = []
+    enrichments = {}
     for r in results:
-        emoji = r.get("emoji", "🔹")
-        title = html.escape(r.get("title", ""))
-        summary = html.escape(r.get("summary", ""))
-        link = r.get("link", "")
-        source = html.escape(source_by_link.get(link, ""))
-        if link:
-            header = f'{emoji} <a href="{html.escape(link, quote=True)}"><b>{title}</b></a>'
-        else:
-            header = f"{emoji} <b>{title}</b>"
-        if source:
-            header += f" <i>({source})</i>"
-        entries.append(f"{header}\n{summary}")
+        try:
+            enrichments[int(r["i"])] = {"emoji": r.get("emoji"), "summary": r.get("summary")}
+        except (KeyError, TypeError, ValueError):
+            continue
 
-    return f"📰 <b>{len(entries)} new item(s)</b>\n\n" + "\n\n".join(entries)
+    return _render(items, enrichments)
