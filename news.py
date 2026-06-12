@@ -4,6 +4,7 @@ load_dotenv()
 
 import html
 import json
+import re
 import feedparser
 from anthropic import Anthropic
 from dedup import load_seen, normalize
@@ -11,6 +12,12 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 MAX_AGE_DAYS = 3
+
+# Web search needs relevance judgement + synthesis, so it stays on Sonnet.
+# Summarising titles into emoji + a one-liner is simple, so Haiku does it
+# (~3x cheaper per token and faster).
+SEARCH_MODEL = "claude-sonnet-4-6"
+SUMMARY_MODEL = "claude-haiku-4-5"
 
 ai = Anthropic()
 
@@ -33,6 +40,16 @@ def _source_name(link):
     if netloc.startswith("www."):
         netloc = netloc[4:]
     return KNOWN_SOURCE_NAMES.get(netloc, netloc)
+
+def _coerce_index(value):
+    """Pull an integer item index out of the model's response. Tolerates ints,
+    "0", and stray formatting like "[0]" (some models echo the label verbatim)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    match = re.search(r"\d+", str(value))
+    return int(match.group()) if match else None
 
 def _extract_json(text):
     raw = text.strip()
@@ -96,10 +113,10 @@ def search_new_items():
     }]
     tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
 
-    response = ai.messages.create(model="claude-sonnet-4-6", max_tokens=1500, tools=tools, messages=messages)
+    response = ai.messages.create(model=SEARCH_MODEL, max_tokens=1500, tools=tools, messages=messages)
     while response.stop_reason == "pause_turn":
         messages.append({"role": "assistant", "content": response.content})
-        response = ai.messages.create(model="claude-sonnet-4-6", max_tokens=1500, tools=tools, messages=messages)
+        response = ai.messages.create(model=SEARCH_MODEL, max_tokens=1500, tools=tools, messages=messages)
 
     text_blocks = [block.text for block in response.content if block.type == "text"]
     if not text_blocks:
@@ -165,11 +182,11 @@ def summarize(items):
     # This keeps output small (avoids token-limit truncation) and removes the
     # risk of the model mangling copied URLs.
     text_blob = "\n\n".join(
-        f"[{idx}] Title: {i['title']}\nRaw: {i['summary'][:300]}"
+        f"Item {idx}:\nTitle: {i['title']}\nRaw: {i['summary'][:300]}"
         for idx, i in enumerate(items)
     )
     msg = ai.messages.create(
-        model="claude-sonnet-4-6",
+        model=SUMMARY_MODEL,
         max_tokens=4000,
         messages=[{
             "role": "user",
@@ -178,7 +195,7 @@ def summarize(items):
                 "(the raw content may be sparse) and pick one emoji that fits its topic. "
                 "Include ALL items, even if the raw content is empty — infer from the title.\n\n"
                 "Respond with ONLY a JSON array (no markdown, no commentary), where each "
-                "element is {\"i\": <the bracketed index>, \"emoji\": ..., \"summary\": ...}.\n\n"
+                "element is {\"i\": <the item number as an integer>, \"emoji\": ..., \"summary\": ...}.\n\n"
                 f"{text_blob}"
             )
         }]
@@ -193,9 +210,8 @@ def summarize(items):
 
     enrichments = {}
     for r in results:
-        try:
-            enrichments[int(r["i"])] = {"emoji": r.get("emoji"), "summary": r.get("summary")}
-        except (KeyError, TypeError, ValueError):
-            continue
+        idx = _coerce_index(r.get("i"))
+        if idx is not None:
+            enrichments[idx] = {"emoji": r.get("emoji"), "summary": r.get("summary")}
 
     return _render(items, enrichments)
