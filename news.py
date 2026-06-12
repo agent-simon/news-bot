@@ -8,16 +8,30 @@ import feedparser
 from anthropic import Anthropic
 from dedup import load_seen, save_seen
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
-MAX_AGE_DAYS = 3
+MAX_AGE_DAYS = 1
 
 ai = Anthropic()
 
 SOURCES = [
-    {"url": "https://news.google.com/rss/search?q=playwright+e2e+testing", "limit": 10},
-    {"url": "https://news.google.com/rss/search?q=AI+test+automation", "limit": 10},
-    {"url": "https://github.com/microsoft/playwright/releases.atom", "limit": 1},
+    {"url": "https://news.google.com/rss/search?q=playwright+e2e+testing", "limit": 10, "name": "Google News"},
+    {"url": "https://news.google.com/rss/search?q=AI+test+automation", "limit": 10, "name": "Google News"},
+    {"url": "https://github.com/microsoft/playwright/releases.atom", "limit": 1, "name": "GitHub"},
+    {"url": "https://hnrss.org/newest?q=playwright", "limit": 5, "name": "Hacker News"},
 ]
+
+KNOWN_SOURCE_NAMES = {
+    "github.com": "GitHub",
+    "news.ycombinator.com": "Hacker News",
+    "news.google.com": "Google News",
+}
+
+def _source_name(link):
+    netloc = urlparse(link).netloc.lower()
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+    return KNOWN_SOURCE_NAMES.get(netloc, netloc)
 
 def _extract_json(text):
     raw = text.strip().strip("`")
@@ -41,7 +55,7 @@ def fetch_new_items():
                 pub_date = datetime(*published[:6], tzinfo=timezone.utc)
                 if pub_date < cutoff:
                     continue
-            items.append({"title": entry.title, "link": entry.link, "summary": entry.get("summary", "")})
+            items.append({"title": entry.title, "link": entry.link, "summary": entry.get("summary", ""), "source": source["name"]})
             seen.add(entry.link)
             added += 1
         print(f"{source['url']} -> added {added}")
@@ -86,7 +100,7 @@ def search_new_items():
         link = result.get("link")
         if not link or link in seen:
             continue
-        items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", "")})
+        items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link)})
         seen.add(link)
 
     save_seen(seen)
@@ -121,16 +135,21 @@ def summarize(items):
     except json.JSONDecodeError:
         return msg.content[0].text
 
+    source_by_link = {i["link"]: i["source"] for i in items}
+
     entries = []
     for r in results:
         emoji = r.get("emoji", "🔹")
         title = html.escape(r.get("title", ""))
         summary = html.escape(r.get("summary", ""))
         link = r.get("link", "")
+        source = html.escape(source_by_link.get(link, ""))
         if link:
             header = f'{emoji} <a href="{html.escape(link, quote=True)}"><b>{title}</b></a>'
         else:
             header = f"{emoji} <b>{title}</b>"
+        if source:
+            header += f" <i>({source})</i>"
         entries.append(f"{header}\n{summary}")
 
     return f"📰 <b>{len(entries)} new item(s)</b>\n\n" + "\n\n".join(entries)
