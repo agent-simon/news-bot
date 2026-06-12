@@ -1,5 +1,8 @@
 # Recommended systemd unit for the news bot.
 #
+# Dependencies are managed with uv. Create the .venv before first start:
+#   uv sync
+#
 # Install on the Pi (adjust User= and the three paths to match your checkout):
 #   sudo cp deploy/news-bot.service /etc/systemd/system/news-bot.service
 #   sudo systemctl daemon-reload
@@ -8,7 +11,7 @@
 #   journalctl -u news-bot.service -f
 #
 # After a code update:
-#   git pull && sudo systemctl restart news-bot.service
+#   git pull && uv sync && sudo systemctl restart news-bot.service
 
 [Unit]
 Description=News aggregator Telegram bot
@@ -29,7 +32,9 @@ Environment=PYTHONUNBUFFERED=1
 # WorkingDirectory is load-bearing: seen_links.db / seen_links.json and the .env
 # file are all resolved relative to it. Point it at the repo checkout.
 WorkingDirectory=/home/sam/work/news-bot
-ExecStart=/home/sam/work/news-bot/venv/bin/python /home/sam/work/news-bot/bot.py
+# Run the uv-managed virtualenv interpreter directly — the service does no
+# dependency resolution at start (uv sync handles that at deploy time).
+ExecStart=/home/sam/work/news-bot/.venv/bin/python /home/sam/work/news-bot/bot.py
 
 # .env is loaded by python-dotenv from WorkingDirectory, so EnvironmentFile is
 # optional. Uncomment to also surface the vars to systemd itself:

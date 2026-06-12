@@ -8,9 +8,10 @@ A Telegram bot that aggregates news from RSS feeds and Claude-driven web search 
 
 ## Running
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`; run `uv sync` to create the `.venv`).
+
 ```bash
-source venv/bin/activate
-python bot.py
+uv run bot.py
 ```
 
 Requires a `.env` file (loaded via `python-dotenv`) with:
