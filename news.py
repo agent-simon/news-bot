@@ -34,10 +34,24 @@ def _source_name(link):
     return KNOWN_SOURCE_NAMES.get(netloc, netloc)
 
 def _extract_json(text):
-    raw = text.strip().strip("`")
-    if raw.startswith("json"):
-        raw = raw[4:].strip()
-    return json.loads(raw)
+    raw = text.strip()
+    # Strip a surrounding ```json ... ``` (or bare ```) code fence if present.
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    # The model sometimes wraps the array in prose ("Here are the items: [...]").
+    # Fall back to slicing out the outermost JSON array/object.
+    starts = [i for i in (raw.find("["), raw.find("{")) if i != -1]
+    ends = [i for i in (raw.rfind("]"), raw.rfind("}")) if i != -1]
+    if starts and ends:
+        return json.loads(raw[min(starts):max(ends) + 1])
+    raise json.JSONDecodeError("no JSON found", raw, 0)
 
 def fetch_new_items():
     seen = load_seen()
