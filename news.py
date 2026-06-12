@@ -116,10 +116,10 @@ def _web_search(instruction):
     messages = [{"role": "user", "content": instruction}]
     tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
 
-    response = ai.messages.create(model=SEARCH_MODEL, max_tokens=1500, tools=tools, messages=messages)
+    response = ai.messages.create(model=SEARCH_MODEL, max_tokens=2000, tools=tools, messages=messages)
     while response.stop_reason == "pause_turn":
         messages.append({"role": "assistant", "content": response.content})
-        response = ai.messages.create(model=SEARCH_MODEL, max_tokens=1500, tools=tools, messages=messages)
+        response = ai.messages.create(model=SEARCH_MODEL, max_tokens=2000, tools=tools, messages=messages)
 
     text_blocks = [block.text for block in response.content if block.type == "text"]
     if not text_blocks:
@@ -141,53 +141,43 @@ def _results_to_items(results, seen):
         items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link)})
     return items
 
-def search_new_items():
+# The fixed topics every web search always covers.
+BASE_TOPICS = [
+    "Playwright, end-to-end testing, and AI-driven test automation",
+    "new model releases and major product announcements from AI labs such as "
+    "Anthropic (Claude), OpenAI (GPT/ChatGPT), Google (Gemini), and Meta (Llama)",
+]
+
+def search_web(include_themes=False):
+    """One web search covering the fixed BASE_TOPICS, plus (on /news) a random
+    sample of SEARCH_THEMES. Single call keeps token/search cost down vs one
+    request per topic group."""
     seen = load_seen()
     cutoff_str = (datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
 
-    results = _web_search(
-        f"Search the web for news from {cutoff_str} onward about:\n"
-        "1. Playwright, end-to-end testing, and AI-driven test automation.\n"
-        "2. New model releases and major product announcements from AI labs "
-        "such as Anthropic (Claude), OpenAI (GPT/ChatGPT), Google (Gemini), "
-        "and Meta (Llama).\n\n"
-        "Find up to 5 relevant articles or announcements, then respond with ONLY a "
-        "JSON array (no markdown, no commentary) where each element has \"title\", "
-        "\"link\" (the source URL) and \"summary\" (1-2 sentences)."
-    )
-    items = _results_to_items(results, seen)
-    print(f"Web search -> added {len(items)}")
-    return items
+    topics = list(BASE_TOPICS)
+    if include_themes and SEARCH_THEMES:
+        topics += random.sample(SEARCH_THEMES, k=min(THEMES_PER_RUN, len(SEARCH_THEMES)))
+    topic_lines = "\n".join(f"- {t}" for t in topics)
 
-def search_themes(count=THEMES_PER_RUN):
-    """Web-search a random handful of SEARCH_THEMES for variety run-to-run."""
-    if not SEARCH_THEMES:
-        return []
-    themes = random.sample(SEARCH_THEMES, k=min(count, len(SEARCH_THEMES)))
-    seen = load_seen()
-    cutoff_str = (datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
-
-    topics = "\n".join(f"- {t}" for t in themes)
     results = _web_search(
-        f"Search the web for recent, noteworthy news from {cutoff_str} onward "
-        "about the following topics:\n"
-        f"{topics}\n\n"
-        "Find up to 5 relevant articles or announcements across these topics, then "
+        f"Search the web for recent, noteworthy news from {cutoff_str} onward about:\n"
+        f"{topic_lines}\n\n"
+        "Find up to 8 relevant articles or announcements across these topics, then "
         "respond with ONLY a JSON array (no markdown, no commentary) where each "
         "element has \"title\", \"link\" (the source URL) and \"summary\" (1-2 sentences)."
     )
     items = _results_to_items(results, seen)
-    print(f"Themed search [{', '.join(themes)}] -> added {len(items)}")
+    print(f"Web search ({len(topics)} topics) -> added {len(items)}")
     return items
 
 
 def collect_new_items(include_themes=False):
-    """Gather candidates from RSS + web search, deduped by normalized link. Does
-    not persist; caller marks items seen after delivery. When include_themes is
-    set, also runs a random-theme web search (used by the on-demand /news)."""
-    sources = fetch_new_items() + search_new_items()
-    if include_themes:
-        sources += search_themes()
+    """Gather candidates from RSS + a single web search, deduped by normalized
+    link. Does not persist; caller marks items seen after delivery. When
+    include_themes is set, the web search also covers random SEARCH_THEMES
+    (used by the on-demand /news)."""
+    sources = fetch_new_items() + search_web(include_themes)
 
     items = []
     picked = set()
