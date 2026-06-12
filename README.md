@@ -32,3 +32,5 @@ python bot.py
 ## Configuration
 
 RSS/Atom sources are defined in `SOURCES` in `news.py`. Each entry has a feed `url` and a `limit` on how many items to consider per run. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.json`) are skipped.
+
+In addition to the RSS sources, Claude performs its own web search each run (`search_new_items()`) to find recent items on the same topics, which are merged in before summarizing.
