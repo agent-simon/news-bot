@@ -1,0 +1,41 @@
+# Recommended systemd unit for the news bot.
+#
+# Install on the Pi (adjust User= and the three paths to match your checkout):
+#   sudo cp deploy/news-bot.service /etc/systemd/system/news-bot.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now news-bot.service
+#   systemctl status news-bot.service
+#   journalctl -u news-bot.service -f
+#
+# After a code update:
+#   git pull && sudo systemctl restart news-bot.service
+
+[Unit]
+Description=News aggregator Telegram bot
+# Wait for real network connectivity before starting (the bot needs it at boot).
+After=network-online.target
+Wants=network-online.target
+# Stop restarting if it fails 5 times within 5 minutes (a hard failure, not a blip).
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=sam
+# WorkingDirectory is load-bearing: seen_links.db / seen_links.json and the .env
+# file are all resolved relative to it. Point it at the repo checkout.
+WorkingDirectory=/home/sam/work/news-bot
+ExecStart=/home/sam/work/news-bot/venv/bin/python /home/sam/work/news-bot/bot.py
+
+# .env is loaded by python-dotenv from WorkingDirectory, so EnvironmentFile is
+# optional. Uncomment to also surface the vars to systemd itself:
+# EnvironmentFile=/home/sam/work/news-bot/.env
+
+# Keep the always-on bot running across crashes and clean exits alike. The
+# StartLimit* guard in [Unit] stops a fatal failure (bad token, broken pull)
+# from restart-looping forever.
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -29,6 +29,31 @@ python bot.py
 - Send `/news` to the bot for an on-demand summary of new items.
 - A daily summary is automatically sent to `CHAT_ID` at 08:00 server time.
 
+## Running as a systemd service
+
+A unit template lives at [`deploy/news-bot.service`](deploy/news-bot.service). Adjust `User=` and the three paths to match your checkout, then install it:
+
+```bash
+sudo cp deploy/news-bot.service /etc/systemd/system/news-bot.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now news-bot.service   # start now + on every boot
+systemctl status news-bot.service
+journalctl -u news-bot.service -f              # tail logs / watch a run
+```
+
+After updating the code:
+
+```bash
+git pull
+sudo systemctl restart news-bot.service
+```
+
+Notes:
+- **`WorkingDirectory` must be the repo checkout** — `.env` and the `seen_links.db` dedup store are resolved relative to it.
+- `seen_links.db` (and a legacy `seen_links.json`) are runtime state, written to `WorkingDirectory`; they're gitignored.
+- The daily job fires at **08:00 server time** — check the host timezone with `timedatectl`.
+- No system packages are required beyond the venv: `sqlite3` is part of the Python standard library.
+
 ## Configuration
 
 RSS/Atom sources are defined in `SOURCES` in `news.py`. Each entry has a feed `url` and a `limit` on how many items to consider per run. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`, a SQLite store) are skipped. Links are committed as seen only after the summary is successfully delivered, so a failed run re-surfaces its items next time.
