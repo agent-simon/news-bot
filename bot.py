@@ -4,21 +4,24 @@ from datetime import time
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from dotenv import load_dotenv
-from news import fetch_new_items, search_new_items, summarize
+from news import collect_new_items, summarize
+from dedup import mark_seen
 
 load_dotenv()
 CHAT_ID = os.environ["CHAT_ID"]
 
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Fetching news...")
-    items = fetch_new_items() + search_new_items()
+    items = collect_new_items()
     summary = summarize(items)
     await update.message.reply_text(summary, parse_mode="HTML", disable_web_page_preview=True)
+    mark_seen([i["link"] for i in items])
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
-    items = fetch_new_items() + search_new_items()
+    items = collect_new_items()
     summary = summarize(items)
     await context.bot.send_message(chat_id=CHAT_ID, text=summary, parse_mode="HTML", disable_web_page_preview=True)
+    mark_seen([i["link"] for i in items])
 
 def main():
     app = ApplicationBuilder().token(os.environ["TELEGRAM_BOT_TOKEN"]).build()

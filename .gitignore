@@ -8,3 +8,5 @@ __pycache__/
 
 # Runtime state
 seen_links.json
+seen_links.db
+seen_links.db-*

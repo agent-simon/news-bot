@@ -6,7 +6,7 @@ import html
 import json
 import feedparser
 from anthropic import Anthropic
-from dedup import load_seen, save_seen
+from dedup import load_seen, normalize
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
@@ -48,7 +48,7 @@ def fetch_new_items():
         feed = feedparser.parse(source["url"])
         added = 0
         for entry in feed.entries[:source["limit"]]:
-            if entry.link in seen:
+            if normalize(entry.link) in seen:
                 continue
             published = entry.get("published_parsed")
             if published:
@@ -56,11 +56,9 @@ def fetch_new_items():
                 if pub_date < cutoff:
                     continue
             items.append({"title": entry.title, "link": entry.link, "summary": entry.get("summary", ""), "source": source["name"]})
-            seen.add(entry.link)
             added += 1
         print(f"{source['url']} -> added {added}")
 
-    save_seen(seen)
     print(f"Total new items: {len(items)}")
     return items
 
@@ -101,13 +99,25 @@ def search_new_items():
     items = []
     for result in results:
         link = result.get("link")
-        if not link or link in seen:
+        if not link or normalize(link) in seen:
             continue
         items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link)})
-        seen.add(link)
 
-    save_seen(seen)
     print(f"Web search -> added {len(items)}")
+    return items
+
+
+def collect_new_items():
+    """Gather candidates from RSS + web search, deduped across both by
+    normalized link. Does not persist; caller marks items seen after delivery."""
+    items = []
+    picked = set()
+    for item in fetch_new_items() + search_new_items():
+        key = normalize(item["link"])
+        if key in picked:
+            continue
+        picked.add(key)
+        items.append(item)
     return items
 
 def summarize(items):
