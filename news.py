@@ -10,7 +10,7 @@ from dedup import load_seen, normalize
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
-MAX_AGE_DAYS = 1
+MAX_AGE_DAYS = 3
 
 ai = Anthropic()
 
