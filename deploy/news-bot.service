@@ -25,13 +25,16 @@ StartLimitBurst=5
 [Service]
 Type=simple
 User=sam
+
 # Unbuffer Python stdout/stderr so print() output reaches the journal in real
 # time (otherwise it block-buffers when stdout isn't a terminal, and
 # `journalctl -f` shows nothing until the buffer flushes).
 Environment=PYTHONUNBUFFERED=1
+
 # WorkingDirectory is load-bearing: seen_links.db / seen_links.json and the .env
 # file are all resolved relative to it. Point it at the repo checkout.
 WorkingDirectory=/home/sam/work/news-bot
+
 # Run the uv-managed virtualenv interpreter directly — the service does no
 # dependency resolution at start (uv sync handles that at deploy time).
 ExecStart=/home/sam/work/news-bot/.venv/bin/python /home/sam/work/news-bot/bot.py
@@ -45,6 +48,24 @@ ExecStart=/home/sam/work/news-bot/.venv/bin/python /home/sam/work/news-bot/bot.p
 # from restart-looping forever.
 Restart=always
 RestartSec=10
+
+# --- Hardening ---
+# Prevent the process (or anything it execs) from gaining new privileges.
+NoNewPrivileges=true
+# Give it a private /tmp, isolated from the rest of the system.
+PrivateTmp=true
+# Mount most of the filesystem read-only; ReadWritePaths below punches the
+# one hole it actually needs (db file, .env, logs if any).
+ProtectSystem=strict
+ReadWritePaths=/home/sam/work/news-bot
+# Block access to /home, /root, /run/user/* other than what's explicitly allowed.
+ProtectHome=true
+# No reason for a Telegram bot to load kernel modules, etc.
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+# Restrict to standard internet address families only.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 [Install]
 WantedBy=multi-user.target
