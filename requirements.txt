@@ -1,5 +1,0 @@
-python-telegram-bot
-feedparser
-anthropic
-apscheduler
-python-dotenv

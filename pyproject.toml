@@ -1,0 +1,16 @@
+[project]
+name = "news-bot"
+version = "0.1.0"
+description = "Telegram bot that aggregates Playwright/AI-testing news and posts Claude-written summaries."
+requires-python = ">=3.11"
+dependencies = [
+    "python-telegram-bot",
+    "feedparser",
+    "anthropic",
+    "apscheduler",
+    "python-dotenv",
+]
+
+[tool.uv]
+# This is an application to run, not a library to build/install.
+package = false

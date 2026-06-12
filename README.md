@@ -4,10 +4,10 @@ A Telegram bot that aggregates news on Playwright/E2E testing and AI test automa
 
 ## Setup
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/). Install uv, then sync the locked dependencies into a project-local `.venv`:
+
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv sync
 ```
 
 Copy `.shadow.env` to `.env` and fill in the values:
@@ -23,7 +23,7 @@ cp .shadow.env .env
 ## Running
 
 ```bash
-python bot.py
+uv run bot.py
 ```
 
 - Send `/news` to the bot for an on-demand summary of new items.
@@ -31,9 +31,10 @@ python bot.py
 
 ## Running as a systemd service
 
-A unit template lives at [`deploy/news-bot.service`](deploy/news-bot.service). Adjust `User=` and the three paths to match your checkout, then install it:
+A unit template lives at [`deploy/news-bot.service`](deploy/news-bot.service). It runs the uv-managed interpreter (`.venv/bin/python`) directly, so the service does no dependency resolution at start — run `uv sync` first to create the `.venv`. Adjust `User=` and the three paths to match your checkout, then install it:
 
 ```bash
+uv sync                                        # create .venv from uv.lock
 sudo cp deploy/news-bot.service /etc/systemd/system/news-bot.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now news-bot.service   # start now + on every boot
@@ -45,6 +46,7 @@ After updating the code:
 
 ```bash
 git pull
+uv sync                                        # apply any dependency changes
 sudo systemctl restart news-bot.service
 ```
 
