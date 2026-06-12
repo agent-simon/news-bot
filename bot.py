@@ -40,7 +40,7 @@ async def _send(send, summary):
 
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Fetching news...")
-    items = collect_new_items()
+    items = collect_new_items(include_themes=True)
     summary = summarize(items)
     await _send(update.message.reply_text, summary)
     mark_seen([i["link"] for i in items])
