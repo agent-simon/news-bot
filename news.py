@@ -19,6 +19,7 @@ SOURCES = [
     {"url": "https://news.google.com/rss/search?q=AI+test+automation", "limit": 10, "name": "Google News"},
     {"url": "https://github.com/microsoft/playwright/releases.atom", "limit": 1, "name": "GitHub"},
     {"url": "https://hnrss.org/newest?q=playwright", "limit": 5, "name": "Hacker News"},
+    {"url": "https://hnrss.org/newest?q=Anthropic+OR+OpenAI+OR+Claude+OR+GPT+OR+Gemini+OR+Llama+OR+LLM&points=20", "limit": 2, "name": "Hacker News"},
 ]
 
 KNOWN_SOURCE_NAMES = {
