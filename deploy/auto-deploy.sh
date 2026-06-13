@@ -4,6 +4,10 @@
 # by news-bot-deploy.timer. Safe to run with no changes (no-op, exit 0).
 set -euo pipefail
 
+# Non-interactive sessions (systemd, ssh) don't source ~/.bashrc, so uv's
+# install location is missing from PATH even though it's on PATH interactively.
+export PATH="$HOME/.local/bin:$PATH"
+
 cd "$(dirname "$0")/.."
 
 if [ -n "$(git status --porcelain)" ]; then
