@@ -23,27 +23,28 @@ SUMMARY_MODEL = "claude-haiku-4-5"
 
 ai = Anthropic()
 
-# Feed/topic config lives in sources.json (edit feeds and topics there).
-# Loaded relative to this file so it works regardless of the process CWD.
-with open(os.path.join(os.path.dirname(__file__), "sources.json"), encoding="utf-8") as _f:
-    _config = json.load(_f)
+# Feed/topic config lives in sources.json (edit feeds and topics there). It's
+# read fresh on each run so edits take effect without restarting the bot.
+#   "sources"            — RSS/Atom feeds: {url, limit, name}
+#   "known_source_names" — display labels for web-search hosts (netloc sans www.)
+#   "base_topics"        — fixed topics every web search covers
+#   "search_themes"      — extra topics /news mixes in at random
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "sources.json")
 
-# RSS/Atom feeds: {url, limit, name}.
-SOURCES = _config["sources"]
-# Display labels for web-search result hosts, keyed by netloc (sans www.).
-KNOWN_SOURCE_NAMES = _config["known_source_names"]
-# Fixed topics every web search covers.
-BASE_TOPICS = _config["base_topics"]
-# Extra topics the on-demand /news mixes in; THEMES_PER_RUN are picked at random
-# per run (only on /news, not the daily job).
-SEARCH_THEMES = _config["search_themes"]
+# How many search_themes /news samples per run (behaviour knob, not data).
 THEMES_PER_RUN = 2
 
-def _source_name(link):
+def load_config():
+    """Read sources.json fresh (CWD-independent), so config edits apply without
+    a restart."""
+    with open(CONFIG_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+def _source_name(link, known_names):
     netloc = urlparse(link).netloc.lower()
     if netloc.startswith("www."):
         netloc = netloc[4:]
-    return KNOWN_SOURCE_NAMES.get(netloc, netloc)
+    return known_names.get(netloc, netloc)
 
 def _coerce_index(value):
     """Pull an integer item index out of the model's response. Tolerates ints,
@@ -80,7 +81,7 @@ def fetch_new_items():
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)
 
-    for source in SOURCES:
+    for source in load_config()["sources"]:
         feed = feedparser.parse(source["url"])
         added = 0
         for entry in feed.entries[:source["limit"]]:
@@ -119,26 +120,28 @@ def _web_search(instruction):
         return []
 
 
-def _results_to_items(results, seen):
+def _results_to_items(results, seen, known_names):
     """Turn raw web-search results into item dicts, skipping already-seen links."""
     items = []
     for result in results:
         link = result.get("link")
         if not link or normalize(link) in seen:
             continue
-        items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link)})
+        items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link, known_names)})
     return items
 
 def search_web(include_themes=False):
-    """One web search covering the fixed BASE_TOPICS, plus (on /news) a random
-    sample of SEARCH_THEMES. Single call keeps token/search cost down vs one
+    """One web search covering the fixed base_topics, plus (on /news) a random
+    sample of search_themes. Single call keeps token/search cost down vs one
     request per topic group."""
+    config = load_config()
     seen = load_seen()
     cutoff_str = (datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
 
-    topics = list(BASE_TOPICS)
-    if include_themes and SEARCH_THEMES:
-        topics += random.sample(SEARCH_THEMES, k=min(THEMES_PER_RUN, len(SEARCH_THEMES)))
+    themes = config["search_themes"]
+    topics = list(config["base_topics"])
+    if include_themes and themes:
+        topics += random.sample(themes, k=min(THEMES_PER_RUN, len(themes)))
     topic_lines = "\n".join(f"- {t}" for t in topics)
 
     results = _web_search(
@@ -148,7 +151,7 @@ def search_web(include_themes=False):
         "respond with ONLY a JSON array (no markdown, no commentary) where each "
         "element has \"title\", \"link\" (the source URL) and \"summary\" (1-2 sentences)."
     )
-    items = _results_to_items(results, seen)
+    items = _results_to_items(results, seen, config["known_source_names"])
     print(f"Web search ({len(topics)} topics) -> added {len(items)}")
     return items
 
@@ -156,7 +159,7 @@ def search_web(include_themes=False):
 def collect_new_items(include_themes=False):
     """Gather candidates from RSS + a single web search, deduped by normalized
     link. Does not persist; caller marks items seen after delivery. When
-    include_themes is set, the web search also covers random SEARCH_THEMES
+    include_themes is set, the web search also covers random search_themes
     (used by the on-demand /news)."""
     sources = fetch_new_items() + search_web(include_themes)
 
