@@ -1,0 +1,14 @@
+# Periodically runs news-bot-deploy.service to pull and deploy updates.
+# Install alongside news-bot-deploy.service:
+#   sudo systemctl enable --now news-bot-deploy.timer
+
+[Unit]
+Description=Periodically check for news-bot updates
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

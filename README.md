@@ -56,6 +56,37 @@ Notes:
 - The daily job fires at **08:00 server time** — check the host timezone with `timedatectl`.
 - No system packages are required beyond the venv: `sqlite3` is part of the Python standard library.
 
+## Auto-deploy
+
+[`deploy/auto-deploy.sh`](deploy/auto-deploy.sh) pulls `origin/main`, and if there are new commits, runs `uv sync` and restarts `news-bot.service`. It's a no-op (exit 0) when already up to date, and refuses to run if the checkout has local changes. [`deploy/news-bot-deploy.timer`](deploy/news-bot-deploy.timer) runs it every 15 minutes via [`deploy/news-bot-deploy.service`](deploy/news-bot-deploy.service) (oneshot).
+
+The restart needs passwordless `sudo` for that one command. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked):
+
+```
+sam ALL=(root) NOPASSWD: /usr/bin/systemctl restart news-bot.service
+```
+
+Then install the timer:
+
+```bash
+sudo cp deploy/news-bot-deploy.service deploy/news-bot-deploy.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now news-bot-deploy.timer
+systemctl list-timers news-bot-deploy.timer   # confirm scheduled
+journalctl -u news-bot-deploy.service -f      # watch a deploy run
+```
+
+To deploy immediately instead of waiting for the timer: `sudo systemctl start news-bot-deploy.service`.
+
+## Local development
+
+Telegram only allows **one active poller per bot token** — running the same bot both on the Pi and locally causes `Conflict: terminated by other getUpdates request` errors and steals updates from whichever instance polls less often.
+
+To develop locally without disrupting the Pi:
+1. Create a second bot via [@BotFather](https://t.me/BotFather) for development.
+2. In your local `.env`, set `TELEGRAM_BOT_TOKEN` to the dev bot's token. You can reuse the same `CHAT_ID` (add the dev bot to that chat) or point `CHAT_ID` at a separate test chat.
+3. `ANTHROPIC_API_KEY` and `sources.json` can stay the same — only the bot identity needs to differ.
+
 ## Configuration
 
 RSS/Atom sources and search topics live in [`sources.json`](sources.json) (edit feeds and topics there). Each `sources` entry has a feed `url`, a `limit` on how many items to consider per run, and a display `name`. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`, a SQLite store) are skipped. Links are committed as seen only after the summary is successfully delivered, so a failed run re-surfaces its items next time.
