@@ -17,30 +17,42 @@ CHAT_ID = os.environ["CHAT_ID"]
 # Telegram rejects messages longer than 4096 chars; stay safely under it.
 TELEGRAM_LIMIT = 4000
 
-def _chunks(text, limit=TELEGRAM_LIMIT):
-    """Split a summary into Telegram-sized pieces on entry (blank-line)
-    boundaries so HTML tags are never cut mid-tag."""
+def _chunks(entries, limit=TELEGRAM_LIMIT):
+    """Group rendered entries ({text, links}) into Telegram-sized pieces on
+    entry boundaries so HTML tags are never cut mid-tag. Each chunk is a
+    (text, links) pair carrying the item links it contains, so the sender can
+    mark them seen only once that chunk is actually delivered."""
     chunks = []
     current = ""
-    for block in text.split("\n\n"):
+    current_links = []
+    for entry in entries:
+        block = entry["text"]
         candidate = f"{current}\n\n{block}" if current else block
         if len(candidate) <= limit:
             current = candidate
+            current_links += entry["links"]
             continue
         if current:
-            chunks.append(current)
-        # A single block over the limit is hard-split as a last resort.
+            chunks.append((current, current_links))
+        # A single block over the limit is hard-split as a last resort; its
+        # links ride the final piece so they're only marked once fully sent.
         while len(block) > limit:
-            chunks.append(block[:limit])
+            chunks.append((block[:limit], []))
             block = block[limit:]
         current = block
+        current_links = list(entry["links"])
     if current:
-        chunks.append(current)
+        chunks.append((current, current_links))
     return chunks
 
-async def _send(send, summary):
-    for chunk in _chunks(summary):
-        await send(chunk, parse_mode="HTML", disable_web_page_preview=True)
+async def _send(send, entries):
+    """Send the rendered entries in Telegram-sized chunks, marking each chunk's
+    items seen as soon as it's delivered. On a mid-batch failure the already-sent
+    items stay marked (no re-post) while the undelivered ones re-surface next run."""
+    for text, links in _chunks(entries):
+        await send(text, parse_mode="HTML", disable_web_page_preview=True)
+        if links:
+            await asyncio.to_thread(mark_seen, links)
 
 FETCH_FAILED_MESSAGE = "⚠️ Failed to fetch the news. Please try again later."
 
@@ -48,31 +60,30 @@ async def _fetch_and_summarize(include_themes=False):
     """Run collect_new_items()/summarize() in a worker thread (blocking network +
     multi-second API calls; offloaded so the event loop stays responsive —
     otherwise PTB's own networking times out, bad on a slow Pi). Returns
-    (items, summary), or (None, None) if either step raised."""
+    (items, entries), or (None, None) if either step raised. `entries` is the
+    rendered {text, links} list that _send delivers (and marks seen) per chunk."""
     try:
         items = await asyncio.to_thread(collect_new_items, include_themes=include_themes)
-        summary = await asyncio.to_thread(summarize, items)
-        return items, summary
+        entries = await asyncio.to_thread(summarize, items)
+        return items, entries
     except Exception:
         logger.exception("Failed to fetch/summarize news")
         return None, None
 
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Fetching news...")
-    items, summary = await _fetch_and_summarize(include_themes=True)
+    items, entries = await _fetch_and_summarize(include_themes=True)
     if items is None:
         await update.message.reply_text(FETCH_FAILED_MESSAGE)
         return
-    await _send(update.message.reply_text, summary)
-    await asyncio.to_thread(mark_seen, [i["link"] for i in items])
+    await _send(update.message.reply_text, entries)
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
-    items, summary = await _fetch_and_summarize()
+    items, entries = await _fetch_and_summarize()
     if items is None:
         await context.bot.send_message(chat_id=CHAT_ID, text=FETCH_FAILED_MESSAGE)
         return
-    await _send(lambda text, **kw: context.bot.send_message(chat_id=CHAT_ID, text=text, **kw), summary)
-    await asyncio.to_thread(mark_seen, [i["link"] for i in items])
+    await _send(lambda text, **kw: context.bot.send_message(chat_id=CHAT_ID, text=text, **kw), entries)
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     # Log transient errors (e.g. telegram.error.TimedOut on a flaky link)
