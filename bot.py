@@ -1,4 +1,6 @@
 # bot.py
+import asyncio
+import logging
 import os
 from datetime import time
 from telegram import Update
@@ -6,6 +8,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from dotenv import load_dotenv
 from news import collect_new_items, summarize
 from dedup import mark_seen
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 CHAT_ID = os.environ["CHAT_ID"]
@@ -40,20 +44,41 @@ async def _send(send, summary):
 
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Fetching news...")
-    items = collect_new_items(include_themes=True)
-    summary = summarize(items)
+    # collect_new_items()/summarize() do blocking network + multi-second API
+    # calls; run them in a worker thread so the event loop stays responsive
+    # (otherwise PTB's own networking times out — bad on a slow Pi).
+    items = await asyncio.to_thread(collect_new_items, include_themes=True)
+    summary = await asyncio.to_thread(summarize, items)
     await _send(update.message.reply_text, summary)
-    mark_seen([i["link"] for i in items])
+    await asyncio.to_thread(mark_seen, [i["link"] for i in items])
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
-    items = collect_new_items()
-    summary = summarize(items)
+    items = await asyncio.to_thread(collect_new_items)
+    summary = await asyncio.to_thread(summarize, items)
     await _send(lambda text, **kw: context.bot.send_message(chat_id=CHAT_ID, text=text, **kw), summary)
-    mark_seen([i["link"] for i in items])
+    await asyncio.to_thread(mark_seen, [i["link"] for i in items])
+
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
+    # Log transient errors (e.g. telegram.error.TimedOut on a flaky link)
+    # instead of dumping an unhandled traceback.
+    logger.error("Handler error: %s", context.error, exc_info=context.error)
 
 def main():
-    app = ApplicationBuilder().token(os.environ["TELEGRAM_BOT_TOKEN"]).build()
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)s %(message)s", level=logging.INFO
+    )
+    app = (
+        ApplicationBuilder()
+        .token(os.environ["TELEGRAM_BOT_TOKEN"])
+        # Generous HTTP timeouts for a slow/weak-WiFi Pi (defaults are ~5s).
+        .connect_timeout(20)
+        .read_timeout(20)
+        .write_timeout(30)
+        .pool_timeout(20)
+        .build()
+    )
     app.add_handler(CommandHandler("news", news_command))
+    app.add_error_handler(on_error)
 
     # Run daily at 08:00 server time
     app.job_queue.run_daily(daily_job, time=time(hour=8, minute=0))
