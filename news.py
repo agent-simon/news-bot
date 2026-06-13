@@ -99,35 +99,73 @@ def fetch_new_items():
     print(f"Total new items: {len(items)}")
     return items
 
+def _search_result_urls(content):
+    """Collect the normalized URLs the web_search tool actually returned, so any
+    link the model emits that wasn't in the results can be rejected as a likely
+    hallucination. Skips error result blocks (their .content isn't a result list)."""
+    urls = set()
+    for block in content:
+        if getattr(block, "type", None) != "web_search_tool_result":
+            continue
+        results = block.content
+        if not isinstance(results, list):
+            continue
+        for result in results:
+            url = getattr(result, "url", None)
+            if url:
+                urls.add(normalize(url))
+    return urls
+
+
 def _web_search(instruction):
-    """Run a Claude web search with the given instruction and return the parsed
-    [{title, link, summary}] list, or [] if nothing usable came back."""
+    """Run a Claude web search with the given instruction and return
+    (parsed [{title, link, summary}] list, set of normalized real result URLs).
+    The URL set is the source of truth for which links are genuine; the parsed
+    list (model-authored JSON) is validated against it by the caller. Either
+    field is empty if nothing usable came back."""
     messages = [{"role": "user", "content": instruction}]
     tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
 
-    response = ai.messages.create(model=SEARCH_MODEL, max_tokens=2000, tools=tools, messages=messages)
+    valid_urls = set()
+    response = ai.messages.create(model=SEARCH_MODEL, max_tokens=4000, tools=tools, messages=messages)
+    valid_urls |= _search_result_urls(response.content)
     while response.stop_reason == "pause_turn":
         messages.append({"role": "assistant", "content": response.content})
-        response = ai.messages.create(model=SEARCH_MODEL, max_tokens=2000, tools=tools, messages=messages)
+        response = ai.messages.create(model=SEARCH_MODEL, max_tokens=4000, tools=tools, messages=messages)
+        valid_urls |= _search_result_urls(response.content)
+
+    if response.stop_reason == "max_tokens":
+        print("web search: response truncated at max_tokens; results may be incomplete")
 
     text_blocks = [block.text for block in response.content if block.type == "text"]
     if not text_blocks:
-        return []
+        return [], valid_urls
     try:
-        return _extract_json(text_blocks[-1])
+        return _extract_json(text_blocks[-1]), valid_urls
     except json.JSONDecodeError:
         print("web search: could not parse response as JSON")
-        return []
+        return [], valid_urls
 
 
-def _results_to_items(results, seen, known_names):
-    """Turn raw web-search results into item dicts, skipping already-seen links."""
+def _results_to_items(results, seen, known_names, valid_urls):
+    """Turn raw web-search results into item dicts, skipping already-seen links
+    and any link the model emitted that wasn't among the real search results
+    (`valid_urls`) — i.e. URLs the model invented rather than read."""
     items = []
+    dropped = 0
     for result in results:
         link = result.get("link")
-        if not link or normalize(link) in seen:
+        if not link:
+            continue
+        norm = normalize(link)
+        if norm in seen:
+            continue
+        if norm not in valid_urls:
+            dropped += 1
             continue
         items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link, known_names)})
+    if dropped:
+        print(f"web search: dropped {dropped} item(s) with links not in search results")
     return items
 
 def search_web(include_themes=False):
@@ -144,14 +182,14 @@ def search_web(include_themes=False):
         topics += random.sample(themes, k=min(THEMES_PER_RUN, len(themes)))
     topic_lines = "\n".join(f"- {t}" for t in topics)
 
-    results = _web_search(
+    results, valid_urls = _web_search(
         f"Search the web for recent, noteworthy news from {cutoff_str} onward about:\n"
         f"{topic_lines}\n\n"
         "Find up to 8 relevant articles or announcements across these topics, then "
         "respond with ONLY a JSON array (no markdown, no commentary) where each "
         "element has \"title\", \"link\" (the source URL) and \"summary\" (1-2 sentences)."
     )
-    items = _results_to_items(results, seen, config["known_source_names"])
+    items = _results_to_items(results, seen, config["known_source_names"], valid_urls)
     print(f"Web search ({len(topics)} topics) -> added {len(items)}")
     return items
 
@@ -175,9 +213,12 @@ def collect_new_items(include_themes=False):
 
 
 def _render(items, enrichments):
-    """Build the HTML Telegram message. `enrichments` maps an item index to
-    {emoji, summary}; missing entries fall back to the item's own data."""
-    entries = []
+    """Build the HTML Telegram message as a list of entries, each
+    {text, links}. The leading title entry has no links; every item entry
+    carries its own link so the sender can mark items seen per delivered chunk.
+    `enrichments` maps an item index to {emoji, summary}; missing entries fall
+    back to the item's own data."""
+    entries = [{"text": f"📰 <b>{len(items)} new item(s)</b>", "links": []}]
     for idx, item in enumerate(items):
         enr = enrichments.get(idx, {})
         emoji = enr.get("emoji") or "🔹"
@@ -191,13 +232,16 @@ def _render(items, enrichments):
             header = f"{emoji} <b>{title}</b>"
         if source:
             header += f" <i>({source})</i>"
-        entries.append(f"{header}\n{summary}" if summary else header)
+        text = f"{header}\n{summary}" if summary else header
+        entries.append({"text": text, "links": [link] if link else []})
 
-    return f"📰 <b>{len(entries)} new item(s)</b>\n\n" + "\n\n".join(entries)
+    return entries
 
 def summarize(items):
+    """Return the rendered message as a list of {text, links} entries (see
+    _render). An empty-news run returns a single linkless notice entry."""
     if not items:
-        return "📰 No new relevant items today."
+        return [{"text": "📰 No new relevant items today.", "links": []}]
 
     # Ask only for emoji + summary keyed by index; title/link/source stay local.
     # This keeps output small (avoids token-limit truncation) and removes the
