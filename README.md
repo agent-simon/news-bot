@@ -60,10 +60,10 @@ Notes:
 
 [`deploy/auto-deploy.sh`](deploy/auto-deploy.sh) pulls `origin/main`, and if there are new commits, runs `uv sync` and restarts `news-bot.service`. It's a no-op (exit 0) when already up to date, and refuses to run if the checkout has local changes. [`deploy/news-bot-deploy.timer`](deploy/news-bot-deploy.timer) runs it every 15 minutes via [`deploy/news-bot-deploy.service`](deploy/news-bot-deploy.service) (oneshot).
 
-The restart needs passwordless `sudo` for that one command. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked):
+The restart needs passwordless `sudo`. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked) — this also covers the `start`/`stop` used by [`scripts/pi-bot.sh`](scripts/pi-bot.sh) below:
 
 ```
-sam ALL=(root) NOPASSWD: /usr/bin/systemctl restart news-bot.service
+sam ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot.service, /usr/bin/systemctl stop news-bot.service, /usr/bin/systemctl restart news-bot.service
 ```
 
 Then install the timer:
@@ -82,10 +82,16 @@ To deploy immediately instead of waiting for the timer: `sudo systemctl start ne
 
 Telegram only allows **one active poller per bot token** — running the same bot both on the Pi and locally causes `Conflict: terminated by other getUpdates request` errors and steals updates from whichever instance polls less often.
 
-To develop locally without disrupting the Pi:
-1. Create a second bot via [@BotFather](https://t.me/BotFather) for development.
-2. In your local `.env`, set `TELEGRAM_BOT_TOKEN` to the dev bot's token. You can reuse the same `CHAT_ID` (add the dev bot to that chat) or point `CHAT_ID` at a separate test chat.
-3. `ANTHROPIC_API_KEY` and `sources.json` can stay the same — only the bot identity needs to differ.
+To develop locally without disrupting the Pi, either:
+
+- **Use a separate dev bot** — create a second bot via [@BotFather](https://t.me/BotFather), and in your local `.env` set `TELEGRAM_BOT_TOKEN` to its token. You can reuse the same `CHAT_ID` (add the dev bot to that chat) or point `CHAT_ID` at a separate test chat. `ANTHROPIC_API_KEY` and `sources.json` can stay the same — only the bot identity differs.
+- **Stop the Pi's bot while you work** — [`scripts/pi-bot.sh`](scripts/pi-bot.sh) SSHes into the Pi to stop/start/restart `news-bot.service`:
+  ```bash
+  scripts/pi-bot.sh stop      # before running locally with the same token
+  scripts/pi-bot.sh start     # when done
+  scripts/pi-bot.sh status
+  ```
+  Requires SSH key access to the Pi (`ssh-copy-id sam@pizero.local` once) and the sudoers entry from "Auto-deploy" above. Override the target with `PI_HOST=user@host`. Note: the auto-deploy timer restarts `news-bot.service` on its own schedule, so if it fires while you're working it'll undo a `stop` — either also stop `news-bot-deploy.timer`, or just re-run `pi-bot.sh stop`.
 
 ## Configuration
 
