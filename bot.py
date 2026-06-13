@@ -3,6 +3,7 @@ import asyncio
 import logging
 import os
 from datetime import time
+from zoneinfo import ZoneInfo
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from dotenv import load_dotenv
@@ -111,8 +112,10 @@ def main():
     app.add_handler(CommandHandler("news", news_command))
     app.add_error_handler(on_error)
 
-    # Run daily at 08:00 server time
-    app.job_queue.run_daily(daily_job, time=time(hour=8, minute=0))
+    # Run daily at 08:00 US/Eastern. The time must carry tzinfo: PTB's JobQueue
+    # scheduler defaults to UTC, so a naive time(hour=8) would fire at 08:00 UTC
+    # regardless of the host's timezone.
+    app.job_queue.run_daily(daily_job, time=time(hour=8, minute=0, tzinfo=ZoneInfo("America/New_York")))
 
     app.run_polling()
 
