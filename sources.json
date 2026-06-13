@@ -11,7 +11,8 @@
   	{"url":"https://www.theverge.com/rss/ai-artificial-intelligence/index.xml","limit":1,"name":"The Verge AI"},
   	{"url":"https://www.wired.com/feed/tag/ai/latest/rss","limit":1,"name":"WIRED"},
     {"url":"https://techcrunch.com/feed/","limit":1,"name":"TechCrunch"},
-  	{"url":"https://news.google.com/rss/search?q=%22AI+test+automation%22+OR+%22AI+QA%22+OR+%22software+testing%22+AI","limit":2,"name":"Google News QA AI"}
+  	{"url":"https://news.google.com/rss/search?q=%22AI+test+automation%22+OR+%22AI+QA%22+OR+%22software+testing%22+AI","limit":2,"name":"Google News QA AI"},
+    {"url":"https://blogs.nvidia.com/feed/","limit":1,"name":"NVIDIA"}
   ],
   "known_source_names": {
     "github.com": "GitHub",
@@ -19,7 +20,9 @@
     "news.google.com": "Google News",
     "venturebeat.com": "VentureBeat",
     "theverge.com": "The Verge",
-    "wired.com": "WIRED"
+    "wired.com": "WIRED",
+    "techcrunch.com": "TechCrunch",
+    "nvidia.com": "NVIDIA"
   },
   "base_topics": [
     "Playwright, end-to-end testing, and AI-driven test automation",
