@@ -19,7 +19,21 @@ Requires a `.env` file (loaded via `python-dotenv`) with:
 - `ANTHROPIC_API_KEY` — Anthropic API key
 - `CHAT_ID` — Telegram chat ID for the daily job
 
+Telegram allows only one active poller per bot token, so local runs must use a
+**different bot token** than the Raspberry Pi deployment (separate `.env`,
+separate bot via @BotFather) — see README's "Local development" section.
+
 There are no automated tests or linters configured.
+
+## Deployment
+
+The Pi runs `news-bot.service` (see `deploy/news-bot.service`) plus a timer,
+`deploy/news-bot-deploy.timer` (+ `news-bot-deploy.service`), that runs
+`deploy/auto-deploy.sh` every 15 minutes: fetches `origin/main`, and if it has
+moved, fast-forwards, runs `uv sync`, and restarts `news-bot.service`. No-op
+if already up to date; refuses to run if the checkout has local changes.
+README's "Auto-deploy" section has install steps including the sudoers
+snippet needed for the passwordless restart.
 
 ## Architecture
 
