@@ -76,7 +76,13 @@ systemctl list-timers news-bot-deploy.timer   # confirm scheduled
 journalctl -u news-bot-deploy.service -f      # watch a deploy run
 ```
 
-To deploy immediately instead of waiting for the timer: `sudo systemctl start news-bot-deploy.service`.
+To deploy immediately instead of waiting for the timer: `sudo systemctl start news-bot-deploy.service` on the Pi, or from your local machine, [`scripts/pi-deploy.sh`](scripts/pi-deploy.sh) SSHes in and runs `deploy/auto-deploy.sh` directly:
+
+```bash
+scripts/pi-deploy.sh
+```
+
+Same SSH access as [`scripts/pi-bot.sh`](scripts/pi-bot.sh) below — no extra sudoers entry needed, since the restart it performs is already covered by the snippet above. Override the target with `PI_HOST=user@host` (and `REPO_DIR=...` if the checkout path differs).
 
 ## Local development
 

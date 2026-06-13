@@ -35,7 +35,9 @@ The Pi runs `news-bot.service` (see `deploy/news-bot.service`) plus a timer,
 moved, fast-forwards, runs `uv sync`, and restarts `news-bot.service`. No-op
 if already up to date; refuses to run if the checkout has local changes.
 README's "Auto-deploy" section has install steps including the sudoers
-snippet needed for the passwordless restart.
+snippet needed for the passwordless restart. `scripts/pi-deploy.sh` SSHes
+into the Pi and runs `deploy/auto-deploy.sh` directly, to deploy on demand
+from a local machine instead of waiting for the timer.
 
 ## Architecture
 
