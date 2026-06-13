@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 CHAT_ID = os.environ["CHAT_ID"]
 
+# Daily auto-post toggle. On by default (incl. unset/empty); set DAILY_NEWS to a
+# falsey value (off/false/0/no) in .env to disable the scheduled 08:00 run
+# without code edits. The /news command stays available either way.
+DAILY_NEWS_ENABLED = os.environ.get("DAILY_NEWS", "").strip().lower() not in {"off", "false", "0", "no", "disabled"}
+
 # Telegram rejects messages longer than 4096 chars; stay safely under it.
 TELEGRAM_LIMIT = 4000
 
@@ -112,10 +117,13 @@ def main():
     app.add_handler(CommandHandler("news", news_command))
     app.add_error_handler(on_error)
 
-    # Run daily at 08:00 US/Eastern. The time must carry tzinfo: PTB's JobQueue
-    # scheduler defaults to UTC, so a naive time(hour=8) would fire at 08:00 UTC
-    # regardless of the host's timezone.
-    app.job_queue.run_daily(daily_job, time=time(hour=8, minute=0, tzinfo=ZoneInfo("America/New_York")))
+    # Run daily at 08:00 US/Eastern (unless disabled via DAILY_NEWS). The time
+    # must carry tzinfo: PTB's JobQueue scheduler defaults to UTC, so a naive
+    # time(hour=8) would fire at 08:00 UTC regardless of the host's timezone.
+    if DAILY_NEWS_ENABLED:
+        app.job_queue.run_daily(daily_job, time=time(hour=8, minute=0, tzinfo=ZoneInfo("America/New_York")))
+    else:
+        logger.info("Daily news disabled via DAILY_NEWS; only /news is active.")
 
     app.run_polling()
 
