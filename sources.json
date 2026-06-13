@@ -11,8 +11,7 @@
   	{"url":"https://www.theverge.com/rss/ai-artificial-intelligence/index.xml","limit":1,"name":"The Verge AI"},
   	{"url":"https://www.wired.com/feed/tag/ai/latest/rss","limit":1,"name":"WIRED"},
     {"url":"https://techcrunch.com/feed/","limit":1,"name":"TechCrunch"},
-  	{"url":"https://news.google.com/rss/search?q=%22AI+test+automation%22+OR+%22AI+QA%22+OR+%22software+testing%22+AI","limit":2,"name":"Google News QA AI"},
-  	{"url":"https://news.google.com/rss/search?q=%22AI+coding+agent%22+OR+%22AI+agent%22+developer+tools","limit":2,"name":"Google News AI Dev Tools"}
+  	{"url":"https://news.google.com/rss/search?q=%22AI+test+automation%22+OR+%22AI+QA%22+OR+%22software+testing%22+AI","limit":2,"name":"Google News QA AI"}
   ],
   "known_source_names": {
     "github.com": "GitHub",
