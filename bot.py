@@ -42,19 +42,35 @@ async def _send(send, summary):
     for chunk in _chunks(summary):
         await send(chunk, parse_mode="HTML", disable_web_page_preview=True)
 
+FETCH_FAILED_MESSAGE = "⚠️ Failed to fetch the news. Please try again later."
+
+async def _fetch_and_summarize(include_themes=False):
+    """Run collect_new_items()/summarize() in a worker thread (blocking network +
+    multi-second API calls; offloaded so the event loop stays responsive —
+    otherwise PTB's own networking times out, bad on a slow Pi). Returns
+    (items, summary), or (None, None) if either step raised."""
+    try:
+        items = await asyncio.to_thread(collect_new_items, include_themes=include_themes)
+        summary = await asyncio.to_thread(summarize, items)
+        return items, summary
+    except Exception:
+        logger.exception("Failed to fetch/summarize news")
+        return None, None
+
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Fetching news...")
-    # collect_new_items()/summarize() do blocking network + multi-second API
-    # calls; run them in a worker thread so the event loop stays responsive
-    # (otherwise PTB's own networking times out — bad on a slow Pi).
-    items = await asyncio.to_thread(collect_new_items, include_themes=True)
-    summary = await asyncio.to_thread(summarize, items)
+    items, summary = await _fetch_and_summarize(include_themes=True)
+    if items is None:
+        await update.message.reply_text(FETCH_FAILED_MESSAGE)
+        return
     await _send(update.message.reply_text, summary)
     await asyncio.to_thread(mark_seen, [i["link"] for i in items])
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
-    items = await asyncio.to_thread(collect_new_items)
-    summary = await asyncio.to_thread(summarize, items)
+    items, summary = await _fetch_and_summarize()
+    if items is None:
+        await context.bot.send_message(chat_id=CHAT_ID, text=FETCH_FAILED_MESSAGE)
+        return
     await _send(lambda text, **kw: context.bot.send_message(chat_id=CHAT_ID, text=text, **kw), summary)
     await asyncio.to_thread(mark_seen, [i["link"] for i in items])
 
