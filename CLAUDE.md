@@ -19,9 +19,11 @@ Requires a `.env` file (loaded via `python-dotenv`) with:
 - `ANTHROPIC_API_KEY` — Anthropic API key
 - `CHAT_ID` — Telegram chat ID for the daily job
 
-Telegram allows only one active poller per bot token, so local runs must use a
-**different bot token** than the Raspberry Pi deployment (separate `.env`,
-separate bot via @BotFather) — see README's "Local development" section.
+Telegram allows only one active poller per bot token, so local runs must either
+use a **different bot token** than the Raspberry Pi deployment (separate `.env`,
+separate bot via @BotFather), or stop the Pi's instance first with
+`scripts/pi-bot.sh stop` (and `start` when done) — see README's "Local
+development" section.
 
 There are no automated tests or linters configured.
 
