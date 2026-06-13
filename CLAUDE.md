@@ -18,6 +18,7 @@ Requires a `.env` file (loaded via `python-dotenv`) with:
 - `TELEGRAM_BOT_TOKEN` — Telegram bot token
 - `ANTHROPIC_API_KEY` — Anthropic API key
 - `CHAT_ID` — Telegram chat ID for the daily job
+- `DAILY_NEWS` — *optional*; set to `off`/`false`/`0`/`no` to disable the daily 08:00 auto-post (the `/news` command still works). Defaults to on when unset/empty.
 
 Telegram allows only one active poller per bot token, so local runs must either
 use a **different bot token** than the Raspberry Pi deployment (separate `.env`,
@@ -41,7 +42,7 @@ from a local machine instead of waiting for the timer.
 
 ## Architecture
 
-- **bot.py** — Telegram bot entrypoint (`python-telegram-bot`). Registers the `/news` command and a daily job (`run_daily`, 08:00 US/Eastern — the `time` carries explicit `tzinfo` because PTB's JobQueue scheduler defaults to UTC). Both call `collect_new_items()` then `summarize()` from `news.py`. `_send()` splits the rendered entries into Telegram-sized chunks and calls `mark_seen()` from `dedup.py` per chunk *as each one is delivered*, so a mid-batch send failure leaves already-sent items marked (no re-post) while undelivered ones re-surface next run. `/news` passes `include_themes=True` for the extra random-theme search; the daily job does not.
+- **bot.py** — Telegram bot entrypoint (`python-telegram-bot`). Registers the `/news` command and (unless `DAILY_NEWS` is set to a falsey value) a daily job (`run_daily`, 08:00 US/Eastern — the `time` carries explicit `tzinfo` because PTB's JobQueue scheduler defaults to UTC). Both call `collect_new_items()` then `summarize()` from `news.py`. `_send()` splits the rendered entries into Telegram-sized chunks and calls `mark_seen()` from `dedup.py` per chunk *as each one is delivered*, so a mid-batch send failure leaves already-sent items marked (no re-post) while undelivered ones re-surface next run. `/news` passes `include_themes=True` for the extra random-theme search; the daily job does not.
 - **sources.json** — Feed/topic config. Edit feeds and topics here. Keys: `sources` (RSS/Atom feeds: `{url, limit, name}`), `known_source_names` (host → display label for web-search results), `base_topics` (fixed topics every web search covers), `search_themes` (extra topics `/news` mixes in at random).
 - **news.py** — Core logic:
   - `load_config()`: reads `sources.json` **fresh on each run** (relative to the module, so it's CWD-independent), so config edits take effect without restarting the bot. `THEMES_PER_RUN` (how many themes `/news` samples per run) stays in `news.py`.
