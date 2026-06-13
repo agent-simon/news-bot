@@ -67,6 +67,10 @@ def main():
     logging.basicConfig(
         format="%(asctime)s %(name)s %(levelname)s %(message)s", level=logging.INFO
     )
+    # httpx (used by python-telegram-bot) logs full request URLs at INFO,
+    # including the bot token embedded in the Telegram API path.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     app = (
         ApplicationBuilder()
         .token(os.environ["TELEGRAM_BOT_TOKEN"])
