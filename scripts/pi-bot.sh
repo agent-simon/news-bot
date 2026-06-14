@@ -19,7 +19,7 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 if [[ -z "${PI_HOST:-}" ]]; then
-    echo "PI_HOST is not set; add it to .env (e.g. PI_HOST=sam@pizero.local)" >&2
+    echo "PI_HOST is not set; add it to .env (e.g. PI_HOST=user@host)" >&2
     exit 1
 fi
 
