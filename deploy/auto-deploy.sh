@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pull-based auto-deploy: fetch origin/main, and if there are new commits,
 # fast-forward, sync dependencies, and restart the service. Run periodically
-# by news-bot-deploy.timer. Safe to run with no changes (no-op, exit 0).
+# by news-bot-deploy@.timer. Safe to run with no changes (no-op, exit 0).
 set -euo pipefail
 
 # Non-interactive sessions (systemd, ssh) don't source ~/.bashrc, so uv's
@@ -36,5 +36,8 @@ if [ -z "${AUTO_DEPLOY_APPLY:-}" ]; then
 fi
 
 uv sync
-sudo systemctl restart news-bot.service
-echo "Deployed $(git rev-parse HEAD) and restarted news-bot.service"
+# The bot runs as the templated unit news-bot@<user>; this deploy job runs as
+# that same user, so its login name is the instance to restart.
+SERVICE="news-bot@$(id -un).service"
+sudo systemctl restart "$SERVICE"
+echo "Deployed $(git rev-parse HEAD) and restarted $SERVICE"
