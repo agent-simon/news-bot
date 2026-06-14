@@ -42,7 +42,7 @@ sudo git clone https://github.com/agent-simon/news-bot.git /opt/news-bot
 sudo /opt/news-bot/deploy/install.sh
 ```
 
-[`deploy/install.sh`](deploy/install.sh) is idempotent (safe to re-run) and does everything below: creates the `newsbot` account, builds the venv, installs the units + sudoers, and enables the service and auto-deploy timer. On the **first** run it seeds `.env` from `.shadow.env` and stops so you can fill in your tokens — edit `/opt/news-bot/.env` (`TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY`, `CHAT_ID`), then run the script again to finish. Then:
+[`deploy/install.sh`](deploy/install.sh) is idempotent (safe to re-run) and does everything below: creates the `newsbot` account, builds the venv, installs the units + sudoers, and enables the service and auto-deploy timer. It configures the system from the **currently checked-out code** — it does not pull (updating the code is `git pull` / auto-deploy's job), so to apply newer unit files, `git pull` first and then re-run it. On the **first** run it seeds `.env` from `.shadow.env` and stops so you can fill in your tokens — edit `/opt/news-bot/.env` (`TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY`, `CHAT_ID`), then run the script again to finish. Then:
 
 ```bash
 systemctl status news-bot.service

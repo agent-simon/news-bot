@@ -9,9 +9,9 @@
 # Overridable via environment (defaults in parentheses):
 #   APP_USER   service account name                         (newsbot)
 #   APP_DIR    install location / git checkout              (/opt/news-bot)
-#   REPO_URL   git remote to clone if APP_DIR is empty
+#   REPO_URL   git remote, used only to clone if APP_DIR is empty
 #                          (https://github.com/agent-simon/news-bot.git)
-#   BRANCH     branch to track                              (main)
+#   BRANCH     branch to clone (initial clone only)         (main)
 #   ADMIN_USER human admin granted start/stop/restart sudo  ($SUDO_USER)
 #
 # NOTE: the bundled .sysusers / .tmpfiles files assume the APP_USER/APP_DIR
@@ -36,20 +36,17 @@ log "Ensuring service user '$APP_USER' exists"
 install -D -m 0644 "$DEPLOY_DIR/news-bot.sysusers" /etc/sysusers.d/news-bot.conf
 systemd-sysusers /etc/sysusers.d/news-bot.conf
 
-# 2. Code at $APP_DIR (clone on first run, fast-forward thereafter). Normalise
-#    ownership before any git op so it runs cleanly as $APP_USER.
-if [[ -d "$APP_DIR/.git" ]]; then
-    log "Updating checkout at $APP_DIR"
-    chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-    sudo -u "$APP_USER" env HOME="$APP_DIR" git -C "$APP_DIR" fetch --quiet origin "$BRANCH"
-    sudo -u "$APP_USER" env HOME="$APP_DIR" git -C "$APP_DIR" checkout --quiet "$BRANCH"
-    sudo -u "$APP_USER" env HOME="$APP_DIR" git -C "$APP_DIR" merge --ff-only --quiet "origin/$BRANCH"
-else
+# 2. Code at $APP_DIR. Clone on first run; otherwise install whatever is already
+#    checked out. The installer deliberately does NOT update the code — that's
+#    `git pull` / auto-deploy's job. Not pulling here also means the installer
+#    can never rewrite itself mid-run (a stale checkout used to corrupt the
+#    running script).
+if [[ ! -d "$APP_DIR/.git" ]]; then
     log "Cloning $REPO_URL into $APP_DIR"
     mkdir -p "$(dirname "$APP_DIR")"
     git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
-    chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 fi
+chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
 # 3. Config — never clobber an existing .env. On first run, seed it from the
 #    template and stop so the operator can fill in secrets, then re-run.
