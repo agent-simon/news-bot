@@ -6,7 +6,7 @@
 #
 # Usage: scripts/pi-deploy.sh
 # Reads PI_HOST=user@host from the repo's .env (or the environment). Override
-# the checkout path with REPO_DIR (default: /home/sam/work/news-bot).
+# the checkout path with REPO_DIR (default: /home/youruser/work/news-bot).
 set -euo pipefail
 
 ENV_FILE="$(dirname "$0")/../.env"
@@ -22,6 +22,6 @@ if [[ -z "${PI_HOST:-}" ]]; then
     exit 1
 fi
 
-REPO_DIR="${REPO_DIR:-/home/sam/work/news-bot}"
+REPO_DIR="${REPO_DIR:-/home/youruser/work/news-bot}"
 
 ssh "$PI_HOST" "$REPO_DIR/deploy/auto-deploy.sh"

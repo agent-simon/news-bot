@@ -63,7 +63,7 @@ Notes:
 The restart needs passwordless `sudo`. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked) — this also covers the `start`/`stop` used by [`scripts/pi-bot.sh`](scripts/pi-bot.sh) below:
 
 ```
-sam ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot.service, /usr/bin/systemctl stop news-bot.service, /usr/bin/systemctl restart news-bot.service
+youruser ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot.service, /usr/bin/systemctl stop news-bot.service, /usr/bin/systemctl restart news-bot.service
 ```
 
 Then install the timer:
@@ -97,7 +97,7 @@ To develop locally without disrupting the Pi, either:
   scripts/pi-bot.sh start     # when done
   scripts/pi-bot.sh status
   ```
-  Requires SSH key access to the Pi (`ssh-copy-id sam@pizero.local` once) and the sudoers entry from "Auto-deploy" above. Override the target with `PI_HOST=user@host`. Note: the auto-deploy timer restarts `news-bot.service` on its own schedule, so if it fires while you're working it'll undo a `stop` — either also stop `news-bot-deploy.timer`, or just re-run `pi-bot.sh stop`.
+  Requires SSH key access to the Pi (`ssh-copy-id user@host` once) and the sudoers entry from "Auto-deploy" above. Override the target with `PI_HOST=user@host`. Note: the auto-deploy timer restarts `news-bot.service` on its own schedule, so if it fires while you're working it'll undo a `stop` — either also stop `news-bot-deploy.timer`, or just re-run `pi-bot.sh stop`.
 
 ## Configuration
 

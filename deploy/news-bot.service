@@ -24,7 +24,7 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=sam
+User=youruser
 
 # Unbuffer Python stdout/stderr so print() output reaches the journal in real
 # time (otherwise it block-buffers when stdout isn't a terminal, and
@@ -33,15 +33,15 @@ Environment=PYTHONUNBUFFERED=1
 
 # WorkingDirectory is load-bearing: seen_links.db / seen_links.json and the .env
 # file are all resolved relative to it. Point it at the repo checkout.
-WorkingDirectory=/home/sam/work/news-bot
+WorkingDirectory=/home/youruser/work/news-bot
 
 # Run the uv-managed virtualenv interpreter directly — the service does no
 # dependency resolution at start (uv sync handles that at deploy time).
-ExecStart=/home/sam/work/news-bot/.venv/bin/python /home/sam/work/news-bot/bot.py
+ExecStart=/home/youruser/work/news-bot/.venv/bin/python /home/youruser/work/news-bot/bot.py
 
 # .env is loaded by python-dotenv from WorkingDirectory, so EnvironmentFile is
 # optional. Uncomment to also surface the vars to systemd itself:
-# EnvironmentFile=/home/sam/work/news-bot/.env
+# EnvironmentFile=/home/youruser/work/news-bot/.env
 
 # Keep the always-on bot running across crashes and clean exits alike. The
 # StartLimit* guard in [Unit] stops a fatal failure (bad token, broken pull)
@@ -57,7 +57,7 @@ PrivateTmp=true
 # Mount most of the filesystem read-only; ReadWritePaths below punches the
 # one hole it actually needs (db file, .env, logs if any).
 ProtectSystem=strict
-ReadWritePaths=/home/sam/work/news-bot
+ReadWritePaths=/home/youruser/work/news-bot
 # Block access to /home, /root, /run/user/* other than what's explicitly allowed.
 ProtectHome=true
 # No reason for a Telegram bot to load kernel modules, etc.

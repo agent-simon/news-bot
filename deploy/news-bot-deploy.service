@@ -12,6 +12,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=sam
-WorkingDirectory=/home/sam/work/news-bot
-ExecStart=/home/sam/work/news-bot/deploy/auto-deploy.sh
+User=youruser
+WorkingDirectory=/home/youruser/work/news-bot
+ExecStart=/home/youruser/work/news-bot/deploy/auto-deploy.sh
