@@ -35,6 +35,12 @@ Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`m
 
 The bot runs as [`deploy/news-bot.service`](deploy/news-bot.service) under a dedicated, unprivileged `newsbot` system account, out of `/opt/news-bot` (the conventional home for a self-contained app, kept off your login user's home and privileges). The unit runs the uv-managed interpreter (`.venv/bin/python`) directly, so the service does no dependency resolution at start.
 
+**Prerequisites:** `git` and [uv](https://docs.astral.sh/uv/). Install uv (the installer puts it in `~/.local/bin`; the install script copies it system-wide for the `newsbot` account):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
 **Install (fresh machine):**
 
 ```bash
