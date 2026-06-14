@@ -5,11 +5,23 @@
 # `uv sync`, and restarts news-bot.service (no-op if already up to date).
 #
 # Usage: scripts/pi-deploy.sh
-# Override the target with PI_HOST=user@host (default: sam@pizero.local) and
+# Reads PI_HOST=user@host from the repo's .env (or the environment). Override
 # the checkout path with REPO_DIR (default: /home/sam/work/news-bot).
 set -euo pipefail
 
-PI_HOST="${PI_HOST:-sam@pizero.local}"
+ENV_FILE="$(dirname "$0")/../.env"
+if [[ -f "$ENV_FILE" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+fi
+
+if [[ -z "${PI_HOST:-}" ]]; then
+    echo "PI_HOST is not set; add it to .env (e.g. PI_HOST=user@host)" >&2
+    exit 1
+fi
+
 REPO_DIR="${REPO_DIR:-/home/sam/work/news-bot}"
 
 ssh "$PI_HOST" "$REPO_DIR/deploy/auto-deploy.sh"
