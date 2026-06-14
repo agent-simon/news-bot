@@ -1,0 +1,8 @@
+# systemd-sysusers declaration for the news-bot service account.
+# Installed to /etc/sysusers.d/news-bot.conf; applied with `systemd-sysusers`.
+# See sysusers.d(5).
+#
+# Columns: Type  Name     ID  GECOS               Home           Shell
+#   u  = create a user (and its private group)
+#   -  = let systemd pick the UID/GID (from the system range)
+u  newsbot  -  "news-bot service"  /opt/news-bot  /usr/sbin/nologin

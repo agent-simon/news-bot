@@ -36,9 +36,14 @@ unprivileged `newsbot` system account out of `/opt/news-bot`, plus a timer,
 `deploy/auto-deploy.sh` every 15 minutes: fetches `origin/main`, and if it has
 moved, fast-forwards, runs `uv sync`, and restarts `news-bot.service`. No-op if
 already up to date; refuses to run if the checkout has local changes.
-README's "Running as a systemd service" / "Auto-deploy" sections have the
-one-time account+`/opt` setup and install steps, including the two-line sudoers
-snippet (newsbot gets `restart`; the human admin gets `start`/`stop`/`restart`).
+A fresh install is one command: `sudo deploy/install.sh` (idempotent) creates
+the account via `deploy/news-bot.sysusers` (`systemd-sysusers`), builds the
+venv, installs the units + `deploy/news-bot.tmpfiles` (`systemd-tmpfiles`, keeps
+`.env` at 0640) + the two-line sudoers snippet (newsbot gets `restart`; the
+human admin — `$SUDO_USER` — gets `start`/`stop`/`restart`), and enables
+everything; on first run it seeds `.env` from `.shadow.env` and stops for you to
+fill in secrets. README's "Running as a systemd service" / "Auto-deploy"
+sections document it and the manual equivalent.
 `scripts/pi-deploy.sh` SSHes into the Pi and runs `deploy/auto-deploy.sh`
 directly, to deploy on demand from a local machine instead of waiting for the
 timer.

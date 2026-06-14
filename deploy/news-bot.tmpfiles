@@ -1,0 +1,9 @@
+# systemd-tmpfiles rules for news-bot.
+# Installed to /etc/tmpfiles.d/news-bot.conf; applied with `systemd-tmpfiles --create`.
+# See tmpfiles.d(5).
+#
+# Columns: Type  Path                Mode  User     Group    Age  Argument
+#   z = adjust mode/owner of an existing path (non-recursive); does NOT create it.
+#       (Z = recursive, d = create dir, f = create file — not needed here.)
+# Keep the secrets file locked down to the service account.
+z  /opt/news-bot/.env  0640  newsbot  newsbot  -
