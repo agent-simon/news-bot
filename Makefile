@@ -6,7 +6,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help sync run pi-start pi-stop pi-restart pi-status deploy
+.PHONY: help sync run pi-start pi-stop pi-restart pi-status pi-logs deploy
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -29,6 +29,9 @@ pi-restart: ## Restart the bot's service on the Pi
 
 pi-status: ## Show the bot's service status on the Pi
 	scripts/pi-bot.sh status
+
+pi-logs: ## Tail the bot's journal on the Pi (Ctrl-C to stop)
+	scripts/pi-bot.sh logs
 
 deploy: ## Trigger an immediate deploy on the Pi
 	scripts/pi-deploy.sh
