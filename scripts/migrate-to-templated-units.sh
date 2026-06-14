@@ -28,7 +28,16 @@ for unit in news-bot.service news-bot-deploy.timer news-bot-deploy.service; do
     fi
 done
 
-# 2. Install the templated unit files.
+# 2. Ensure the virtualenv exists — the service execs .venv/bin/python, so a
+# missing venv fails the unit with status=203/EXEC.
+echo "Syncing dependencies (uv sync)"
+if ! command -v uv >/dev/null; then
+    echo "uv not found on PATH — install uv (or run 'uv sync' manually) first." >&2
+    exit 1
+fi
+( cd "$REPO_DIR" && uv sync )
+
+# 3. Install the templated unit files.
 echo "Installing templated unit files"
 sudo cp "$REPO_DIR"/deploy/news-bot@.service \
         "$REPO_DIR"/deploy/news-bot-deploy@.service \
@@ -36,7 +45,7 @@ sudo cp "$REPO_DIR"/deploy/news-bot@.service \
         "$SYSTEMD_DIR/"
 sudo systemctl daemon-reload
 
-# 3. Refresh the passwordless-sudo snippet for the restart (new unit name).
+# 4. Refresh the passwordless-sudo snippet for the restart (new unit name).
 echo "Writing $SUDOERS_FILE"
 tmp_sudoers="$(mktemp)"
 cat >"$tmp_sudoers" <<EOF
@@ -46,7 +55,7 @@ sudo visudo -cf "$tmp_sudoers"            # syntax-check before installing
 sudo install -m 0440 "$tmp_sudoers" "$SUDOERS_FILE"
 rm -f "$tmp_sudoers"
 
-# 4. Enable the new instances for this user.
+# 5. Enable the new instances for this user.
 echo "Enabling news-bot@$USER_NAME.service and news-bot-deploy@$USER_NAME.timer"
 sudo systemctl enable --now "news-bot@$USER_NAME.service"
 sudo systemctl enable --now "news-bot-deploy@$USER_NAME.timer"
