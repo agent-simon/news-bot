@@ -64,8 +64,13 @@ PrivateTmp=true
 # one hole it actually needs (db file, .env, logs if any).
 ProtectSystem=strict
 ReadWritePaths=/home/%i/work/news-bot
-# Block access to /home, /root, /run/user/* other than what's explicitly allowed.
-ProtectHome=true
+# Make /home, /root, /run/user/* read-only (not fully hidden): the bot runs out
+# of /home/%i/work/news-bot and its venv interpreter is reached via that path,
+# so the home tree must stay visible. ReadWritePaths above re-grants write to
+# just the checkout (for seen_links.db). NOTE: ProtectHome=true (fully hidden)
+# breaks ExecStart here with status=203/EXEC — the ReadWritePaths hole isn't
+# enough for systemd to resolve the interpreter path under a hidden /home.
+ProtectHome=read-only
 # No reason for a Telegram bot to load kernel modules, etc.
 ProtectKernelModules=true
 ProtectKernelLogs=true
