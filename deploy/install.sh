@@ -90,7 +90,7 @@ sudoers_tmp="$(mktemp)"
 {
     echo "$APP_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart news-bot.service"
     if [[ -n "$ADMIN_USER" && "$ADMIN_USER" != "root" ]]; then
-        echo "$ADMIN_USER ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot.service, /usr/bin/systemctl stop news-bot.service, /usr/bin/systemctl restart news-bot.service"
+        echo "$ADMIN_USER ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot.service, /usr/bin/systemctl stop news-bot.service, /usr/bin/systemctl restart news-bot.service, /usr/bin/systemctl start news-bot-deploy.service"
     fi
 } >"$sudoers_tmp"
 visudo -cf "$sudoers_tmp"

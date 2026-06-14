@@ -101,11 +101,11 @@ Notes:
 
 [`deploy/auto-deploy.sh`](deploy/auto-deploy.sh) pulls `origin/main`, and if there are new commits, runs `uv sync` and restarts `news-bot.service`. It's a no-op (exit 0) when already up to date, and refuses to run if the checkout has local changes. [`deploy/news-bot-deploy.timer`](deploy/news-bot-deploy.timer) runs it every 15 minutes via [`deploy/news-bot-deploy.service`](deploy/news-bot-deploy.service) (oneshot), both also running as `newsbot`.
 
-The restart needs passwordless `sudo`. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked). Two lines, least-privilege: `newsbot` (the deploy account) gets only `restart`; your login user — replace `<you>` — gets `start`/`stop`/`restart` for [`scripts/pi-bot.sh`](scripts/pi-bot.sh) below:
+The restart needs passwordless `sudo`. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked). Two lines, least-privilege: `newsbot` (the deploy account) gets only `restart`; your login user — replace `<you>` — gets `start`/`stop`/`restart` for [`scripts/pi-bot.sh`](scripts/pi-bot.sh) plus `start news-bot-deploy.service` to trigger a deploy on demand via [`scripts/pi-deploy.sh`](scripts/pi-deploy.sh):
 
 ```
 newsbot ALL=(root) NOPASSWD: /usr/bin/systemctl restart news-bot.service
-<you> ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot.service, /usr/bin/systemctl stop news-bot.service, /usr/bin/systemctl restart news-bot.service
+<you> ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot.service, /usr/bin/systemctl stop news-bot.service, /usr/bin/systemctl restart news-bot.service, /usr/bin/systemctl start news-bot-deploy.service
 ```
 
 Then install the timer:
@@ -118,13 +118,13 @@ systemctl list-timers news-bot-deploy.timer      # confirm scheduled
 journalctl -u news-bot-deploy.service -f         # watch a deploy run
 ```
 
-To deploy immediately instead of waiting for the timer: `sudo systemctl start news-bot-deploy.service` on the Pi, or from your local machine, [`scripts/pi-deploy.sh`](scripts/pi-deploy.sh) SSHes in and runs `deploy/auto-deploy.sh` directly:
+To deploy immediately instead of waiting for the timer: `sudo systemctl start news-bot-deploy.service` on the Pi, or from your local machine, [`scripts/pi-deploy.sh`](scripts/pi-deploy.sh) SSHes in and starts that same oneshot unit (so the deploy runs as `newsbot`, the checkout's owner):
 
 ```bash
 scripts/pi-deploy.sh
 ```
 
-Same SSH access as [`scripts/pi-bot.sh`](scripts/pi-bot.sh) below — no extra sudoers entry needed, since the restart it performs is already covered by the snippet above. Reads `PI_HOST=user@host` from `.env` (override `REPO_DIR=...` if the checkout path differs).
+Same SSH access as [`scripts/pi-bot.sh`](scripts/pi-bot.sh) below, and it relies on the `start news-bot-deploy.service` grant in the sudoers snippet above. Reads `PI_HOST=user@host` from `.env`.
 
 ## Local development
 

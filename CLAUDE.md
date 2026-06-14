@@ -44,8 +44,10 @@ human admin — `$SUDO_USER` — gets `start`/`stop`/`restart`), and enables
 everything; on first run it seeds `.env` from `.shadow.env` and stops for you to
 fill in secrets. README's "Running as a systemd service" / "Auto-deploy"
 sections document it and the manual equivalent.
-`scripts/pi-deploy.sh` SSHes into the Pi and runs `deploy/auto-deploy.sh`
-directly, to deploy on demand from a local machine instead of waiting for the
+`scripts/pi-deploy.sh` SSHes into the Pi and starts the `news-bot-deploy`
+oneshot (so the deploy runs as `newsbot`, the checkout's owner — running
+`auto-deploy.sh` directly as the SSH login user trips git's dubious-ownership
+guard), to deploy on demand from a local machine instead of waiting for the
 timer.
 
 ## Architecture
