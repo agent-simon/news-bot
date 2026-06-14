@@ -35,34 +35,46 @@ Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`m
 
 The bot runs as [`deploy/news-bot.service`](deploy/news-bot.service) under a dedicated, unprivileged `newsbot` system account, out of `/opt/news-bot` (the conventional home for a self-contained app, kept off your login user's home and privileges). The unit runs the uv-managed interpreter (`.venv/bin/python`) directly, so the service does no dependency resolution at start.
 
-**One-time setup** — create the account, install the app under `/opt`, and build the venv:
+**Install (fresh machine):**
 
 ```bash
-# Dedicated service account: no login, home is the app dir (gives uv a writable HOME).
-sudo useradd --system --home-dir /opt/news-bot --shell /usr/sbin/nologin newsbot
-
-# Put the code in /opt and hand ownership to newsbot.
 sudo git clone https://github.com/agent-simon/news-bot.git /opt/news-bot
-sudo cp /opt/news-bot/.shadow.env /opt/news-bot/.env   # then fill in the values
-sudo chown -R newsbot:newsbot /opt/news-bot
-sudo chmod 640 /opt/news-bot/.env                      # secrets: not world-readable
-
-# uv must be on a system-wide PATH so newsbot can run it (e.g. copy your binary):
-sudo cp "$(command -v uv)" /usr/local/bin/
-
-# Build the venv as newsbot (HOME is set explicitly — nologin means no `sudo -i`):
-sudo -u newsbot env HOME=/opt/news-bot bash -c 'cd /opt/news-bot && uv sync'
+sudo /opt/news-bot/deploy/install.sh
 ```
 
-Then install and start the unit:
+[`deploy/install.sh`](deploy/install.sh) is idempotent (safe to re-run) and does everything below: creates the `newsbot` account, builds the venv, installs the units + sudoers, and enables the service and auto-deploy timer. On the **first** run it seeds `.env` from `.shadow.env` and stops so you can fill in your tokens — edit `/opt/news-bot/.env` (`TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY`, `CHAT_ID`), then run the script again to finish. Then:
 
 ```bash
-sudo cp /opt/news-bot/deploy/news-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now news-bot.service       # start now + on every boot
 systemctl status news-bot.service
 journalctl -u news-bot.service -f                  # tail logs / watch a run
 ```
+
+Override defaults with env vars if needed, e.g. `sudo ADMIN_USER=pi REPO_URL=… /opt/news-bot/deploy/install.sh`.
+
+<details>
+<summary>What the script does (the manual equivalent)</summary>
+
+```bash
+# 1. Dedicated service account — declared in deploy/news-bot.sysusers, applied by:
+sudo install -m644 /opt/news-bot/deploy/news-bot.sysusers /etc/sysusers.d/news-bot.conf
+sudo systemd-sysusers                                  # no login, home = app dir
+
+# 2. Ownership + config (secrets not world-readable):
+sudo chown -R newsbot:newsbot /opt/news-bot
+sudo install -m640 -o newsbot -g newsbot /opt/news-bot/.shadow.env /opt/news-bot/.env  # fill in
+
+# 3. uv on a system-wide PATH so newsbot can run it; build the venv as newsbot
+#    (HOME set explicitly — nologin means no `sudo -i`):
+sudo cp "$(command -v uv)" /usr/local/bin/
+sudo -u newsbot env HOME=/opt/news-bot bash -c 'cd /opt/news-bot && uv sync'
+
+# 4. Units + the tmpfiles rule that keeps .env at 0640, then enable:
+sudo cp /opt/news-bot/deploy/news-bot.service /etc/systemd/system/
+sudo install -m644 /opt/news-bot/deploy/news-bot.tmpfiles /etc/tmpfiles.d/news-bot.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/news-bot.conf
+sudo systemctl daemon-reload && sudo systemctl enable --now news-bot.service
+```
+</details>
 
 Updating the code by hand (auto-deploy, below, does this for you):
 
@@ -78,6 +90,8 @@ Notes:
 - No system packages are required beyond the venv: `sqlite3` is part of the Python standard library.
 
 ## Auto-deploy
+
+`deploy/install.sh` already installs and enables this; the rest of this section explains what it set up (and how to do it by hand).
 
 [`deploy/auto-deploy.sh`](deploy/auto-deploy.sh) pulls `origin/main`, and if there are new commits, runs `uv sync` and restarts `news-bot.service`. It's a no-op (exit 0) when already up to date, and refuses to run if the checkout has local changes. [`deploy/news-bot-deploy.timer`](deploy/news-bot-deploy.timer) runs it every 15 minutes via [`deploy/news-bot-deploy.service`](deploy/news-bot-deploy.service) (oneshot), both also running as `newsbot`.
 
