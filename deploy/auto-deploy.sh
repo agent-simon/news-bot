@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Pull-based auto-deploy: fetch origin/main, and if there are new commits,
 # fast-forward, sync dependencies, and restart the service. Run periodically
-# by news-bot-deploy@.timer. Safe to run with no changes (no-op, exit 0).
+# by news-bot-deploy.timer. Safe to run with no changes (no-op, exit 0).
 set -euo pipefail
 
-# Non-interactive sessions (systemd, ssh) don't source ~/.bashrc, so uv's
-# install location is missing from PATH even though it's on PATH interactively.
+# Non-interactive sessions (systemd, ssh) don't source ~/.bashrc, so a uv that
+# was installed under $HOME may be missing from PATH. /usr/local/bin (where a
+# system-wide uv lives) is already on the default PATH; keep this for the
+# home-install case too.
 export PATH="$HOME/.local/bin:$PATH"
 
 cd "$(dirname "$0")/.."
@@ -36,8 +38,5 @@ if [ -z "${AUTO_DEPLOY_APPLY:-}" ]; then
 fi
 
 uv sync
-# The bot runs as the templated unit news-bot@<user>; this deploy job runs as
-# that same user, so its login name is the instance to restart.
-SERVICE="news-bot@$(id -un).service"
-sudo systemctl restart "$SERVICE"
-echo "Deployed $(git rev-parse HEAD) and restarted $SERVICE"
+sudo systemctl restart news-bot.service
+echo "Deployed $(git rev-parse HEAD) and restarted news-bot.service"

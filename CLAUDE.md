@@ -30,18 +30,18 @@ There are no automated tests or linters configured.
 
 ## Deployment
 
-The Pi runs `news-bot@<user>.service` (a templated/instantiated unit — see
-`deploy/news-bot@.service`, where `%i` is the Linux account and home checkout
-it runs as) plus a timer, `deploy/news-bot-deploy@.timer`
-(+ `news-bot-deploy@.service`), that runs `deploy/auto-deploy.sh` every 15
-minutes: fetches `origin/main`, and if it has moved, fast-forwards, runs
-`uv sync`, and restarts `news-bot@<user>.service` (resolving `<user>` via
-`id -un`). No-op if already up to date; refuses to run if the checkout has
-local changes.
-README's "Auto-deploy" section has install steps including the sudoers
-snippet needed for the passwordless restart. `scripts/pi-deploy.sh` SSHes
-into the Pi and runs `deploy/auto-deploy.sh` directly, to deploy on demand
-from a local machine instead of waiting for the timer.
+The Pi runs `news-bot.service` (see `deploy/news-bot.service`) as a dedicated
+unprivileged `newsbot` system account out of `/opt/news-bot`, plus a timer,
+`deploy/news-bot-deploy.timer` (+ `news-bot-deploy.service`), that runs
+`deploy/auto-deploy.sh` every 15 minutes: fetches `origin/main`, and if it has
+moved, fast-forwards, runs `uv sync`, and restarts `news-bot.service`. No-op if
+already up to date; refuses to run if the checkout has local changes.
+README's "Running as a systemd service" / "Auto-deploy" sections have the
+one-time account+`/opt` setup and install steps, including the two-line sudoers
+snippet (newsbot gets `restart`; the human admin gets `start`/`stop`/`restart`).
+`scripts/pi-deploy.sh` SSHes into the Pi and runs `deploy/auto-deploy.sh`
+directly, to deploy on demand from a local machine instead of waiting for the
+timer.
 
 ## Architecture
 

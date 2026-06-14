@@ -23,15 +23,17 @@ if [[ -z "${PI_HOST:-}" ]]; then
     exit 1
 fi
 
-# The bot runs as the templated unit news-bot@<user>, where <user> is the Pi
-# login account. Resolve the instance on the Pi (id -un) so this works whatever
-# user PI_HOST points at.
+# The bot runs under the dedicated newsbot account, but you SSH in as your own
+# login user; the start/stop/restart sudo rights are granted to that login user
+# in /etc/sudoers.d/news-bot-deploy (see README's auto-deploy section).
+SERVICE="news-bot.service"
+
 case "${1:-}" in
     start|stop|restart)
-        ssh "$PI_HOST" "s=news-bot@\$(id -un).service; sudo systemctl $1 \$s && systemctl status \$s --no-pager"
+        ssh "$PI_HOST" "sudo systemctl $1 $SERVICE && systemctl status $SERVICE --no-pager"
         ;;
     status)
-        ssh "$PI_HOST" "s=news-bot@\$(id -un).service; systemctl status \$s --no-pager"
+        ssh "$PI_HOST" "systemctl status $SERVICE --no-pager"
         ;;
     *)
         echo "Usage: $0 {start|stop|restart|status}" >&2

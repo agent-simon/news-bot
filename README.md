@@ -33,52 +33,72 @@ Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`m
 
 ## Running as a systemd service
 
-A unit template lives at [`deploy/news-bot@.service`](deploy/news-bot@.service). It's a [systemd instantiated unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html#Description): the instance name (`%i`) is the Linux account it runs as, and `User=` / `WorkingDirectory` / `ExecStart` are derived from it — `news-bot@alice.service` runs as `alice` out of `/home/alice/work/news-bot`. So you install the file once and enable it for your user; no per-host edits. It runs the uv-managed interpreter (`.venv/bin/python`) directly, so the service does no dependency resolution at start — run `uv sync` first to create the `.venv`. Replace `<user>` below with your account:
+The bot runs as [`deploy/news-bot.service`](deploy/news-bot.service) under a dedicated, unprivileged `newsbot` system account, out of `/opt/news-bot` (the conventional home for a self-contained app, kept off your login user's home and privileges). The unit runs the uv-managed interpreter (`.venv/bin/python`) directly, so the service does no dependency resolution at start.
+
+**One-time setup** — create the account, install the app under `/opt`, and build the venv:
 
 ```bash
-uv sync                                            # create .venv from uv.lock
-sudo cp deploy/news-bot@.service /etc/systemd/system/news-bot@.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now news-bot@<user>.service  # start now + on every boot
-systemctl status news-bot@<user>.service
-journalctl -u news-bot@<user>.service -f           # tail logs / watch a run
+# Dedicated service account: no login, home is the app dir (gives uv a writable HOME).
+sudo useradd --system --home-dir /opt/news-bot --shell /usr/sbin/nologin newsbot
+
+# Put the code in /opt and hand ownership to newsbot.
+sudo git clone https://github.com/agent-simon/news-bot.git /opt/news-bot
+sudo cp /opt/news-bot/.shadow.env /opt/news-bot/.env   # then fill in the values
+sudo chown -R newsbot:newsbot /opt/news-bot
+sudo chmod 640 /opt/news-bot/.env                      # secrets: not world-readable
+
+# uv must be on a system-wide PATH so newsbot can run it (e.g. copy your binary):
+sudo cp "$(command -v uv)" /usr/local/bin/
+
+# Build the venv as newsbot (HOME is set explicitly — nologin means no `sudo -i`):
+sudo -u newsbot env HOME=/opt/news-bot bash -c 'cd /opt/news-bot && uv sync'
 ```
 
-After updating the code:
+Then install and start the unit:
 
 ```bash
-git pull
-uv sync                                            # apply any dependency changes
-sudo systemctl restart news-bot@<user>.service
+sudo cp /opt/news-bot/deploy/news-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now news-bot.service       # start now + on every boot
+systemctl status news-bot.service
+journalctl -u news-bot.service -f                  # tail logs / watch a run
+```
+
+Updating the code by hand (auto-deploy, below, does this for you):
+
+```bash
+sudo -u newsbot env HOME=/opt/news-bot bash -c 'cd /opt/news-bot && git pull && uv sync'
+sudo systemctl restart news-bot.service
 ```
 
 Notes:
-- **The template assumes the checkout is at `~/work/news-bot`** for the enabled user (that's where `WorkingDirectory` points). `.env` and the `seen_links.db` dedup store are resolved relative to it; clone there, or edit the paths in `deploy/news-bot@.service`.
+- **`WorkingDirectory=/opt/news-bot` is load-bearing** — `.env` and the `seen_links.db` dedup store are resolved relative to it.
 - `seen_links.db` (and a legacy `seen_links.json`) are runtime state, written to `WorkingDirectory`; they're gitignored.
 - The daily job fires at **08:00 server time** — check the host timezone with `timedatectl`.
 - No system packages are required beyond the venv: `sqlite3` is part of the Python standard library.
 
 ## Auto-deploy
 
-[`deploy/auto-deploy.sh`](deploy/auto-deploy.sh) pulls `origin/main`, and if there are new commits, runs `uv sync` and restarts the bot (`news-bot@<user>.service`, resolving `<user>` from the account it runs as). It's a no-op (exit 0) when already up to date, and refuses to run if the checkout has local changes. [`deploy/news-bot-deploy@.timer`](deploy/news-bot-deploy@.timer) runs it every 15 minutes via [`deploy/news-bot-deploy@.service`](deploy/news-bot-deploy@.service) (oneshot) — both are instantiated units, enabled for the same user as the bot.
+[`deploy/auto-deploy.sh`](deploy/auto-deploy.sh) pulls `origin/main`, and if there are new commits, runs `uv sync` and restarts `news-bot.service`. It's a no-op (exit 0) when already up to date, and refuses to run if the checkout has local changes. [`deploy/news-bot-deploy.timer`](deploy/news-bot-deploy.timer) runs it every 15 minutes via [`deploy/news-bot-deploy.service`](deploy/news-bot-deploy.service) (oneshot), both also running as `newsbot`.
 
-The restart needs passwordless `sudo`. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked) — this also covers the `start`/`stop` used by [`scripts/pi-bot.sh`](scripts/pi-bot.sh) below (replace `<user>` with your account in both the leading field and the unit names):
+The restart needs passwordless `sudo`. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked). Two lines, least-privilege: `newsbot` (the deploy account) gets only `restart`; your login user — replace `<you>` — gets `start`/`stop`/`restart` for [`scripts/pi-bot.sh`](scripts/pi-bot.sh) below:
 
 ```
-<user> ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot@<user>.service, /usr/bin/systemctl stop news-bot@<user>.service, /usr/bin/systemctl restart news-bot@<user>.service
+newsbot ALL=(root) NOPASSWD: /usr/bin/systemctl restart news-bot.service
+<you> ALL=(root) NOPASSWD: /usr/bin/systemctl start news-bot.service, /usr/bin/systemctl stop news-bot.service, /usr/bin/systemctl restart news-bot.service
 ```
 
 Then install the timer:
 
 ```bash
-sudo cp deploy/news-bot-deploy@.service deploy/news-bot-deploy@.timer /etc/systemd/system/
+sudo cp /opt/news-bot/deploy/news-bot-deploy.service /opt/news-bot/deploy/news-bot-deploy.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now news-bot-deploy@<user>.timer
-systemctl list-timers 'news-bot-deploy@*'        # confirm scheduled
-journalctl -u news-bot-deploy@<user>.service -f  # watch a deploy run
+sudo systemctl enable --now news-bot-deploy.timer
+systemctl list-timers news-bot-deploy.timer      # confirm scheduled
+journalctl -u news-bot-deploy.service -f         # watch a deploy run
 ```
 
-To deploy immediately instead of waiting for the timer: `sudo systemctl start news-bot-deploy@<user>.service` on the Pi, or from your local machine, [`scripts/pi-deploy.sh`](scripts/pi-deploy.sh) SSHes in and runs `deploy/auto-deploy.sh` directly:
+To deploy immediately instead of waiting for the timer: `sudo systemctl start news-bot-deploy.service` on the Pi, or from your local machine, [`scripts/pi-deploy.sh`](scripts/pi-deploy.sh) SSHes in and runs `deploy/auto-deploy.sh` directly:
 
 ```bash
 scripts/pi-deploy.sh
@@ -93,13 +113,13 @@ Telegram only allows **one active poller per bot token** — running the same bo
 To develop locally without disrupting the Pi, either:
 
 - **Use a separate dev bot** — create a second bot via [@BotFather](https://t.me/BotFather), and in your local `.env` set `TELEGRAM_BOT_TOKEN` to its token. You can reuse the same `CHAT_ID` (add the dev bot to that chat) or point `CHAT_ID` at a separate test chat. `ANTHROPIC_API_KEY` and `sources.json` can stay the same — only the bot identity differs.
-- **Stop the Pi's bot while you work** — [`scripts/pi-bot.sh`](scripts/pi-bot.sh) SSHes into the Pi to stop/start/restart the bot (it resolves the `news-bot@<user>` instance from the SSH login account on the Pi):
+- **Stop the Pi's bot while you work** — [`scripts/pi-bot.sh`](scripts/pi-bot.sh) SSHes into the Pi to stop/start/restart `news-bot.service`:
   ```bash
   scripts/pi-bot.sh stop      # before running locally with the same token
   scripts/pi-bot.sh start     # when done
   scripts/pi-bot.sh status
   ```
-  Requires SSH key access to the Pi (`ssh-copy-id user@host` once), `PI_HOST=user@host` in your `.env`, and the sudoers entry from "Auto-deploy" above. Note: the auto-deploy timer restarts the bot on its own schedule, so if it fires while you're working it'll undo a `stop` — either also stop `news-bot-deploy@<user>.timer`, or just re-run `pi-bot.sh stop`.
+  Requires SSH key access to the Pi (`ssh-copy-id user@host` once), `PI_HOST=user@host` in your `.env`, and the sudoers entry for your login user from "Auto-deploy" above. Note: the auto-deploy timer restarts the bot on its own schedule, so if it fires while you're working it'll undo a `stop` — either also stop `news-bot-deploy.timer`, or just re-run `pi-bot.sh stop`.
 
 ## Configuration
 
