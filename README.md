@@ -29,6 +29,8 @@ uv run bot.py
 - Send `/news` to the bot for an on-demand summary of new items.
 - A daily summary is automatically sent to `CHAT_ID` at 08:00 server time.
 
+Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`make sync`, `make run`, `make pi-stop`/`pi-start`/`pi-status`, `make deploy`).
+
 ## Running as a systemd service
 
 A unit template lives at [`deploy/news-bot@.service`](deploy/news-bot@.service). It's a [systemd instantiated unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html#Description): the instance name (`%i`) is the Linux account it runs as, and `User=` / `WorkingDirectory` / `ExecStart` are derived from it — `news-bot@alice.service` runs as `alice` out of `/home/alice/work/news-bot`. So you install the file once and enable it for your user; no per-host edits. It runs the uv-managed interpreter (`.venv/bin/python`) directly, so the service does no dependency resolution at start — run `uv sync` first to create the `.venv`. Replace `<user>` below with your account:
