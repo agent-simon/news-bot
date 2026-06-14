@@ -33,7 +33,7 @@ die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 # 1. Service account — declared in sysusers.d, created by systemd-sysusers.
 log "Ensuring service user '$APP_USER' exists"
-install -m 0644 "$DEPLOY_DIR/news-bot.sysusers" /etc/sysusers.d/news-bot.conf
+install -D -m 0644 "$DEPLOY_DIR/news-bot.sysusers" /etc/sysusers.d/news-bot.conf
 systemd-sysusers /etc/sysusers.d/news-bot.conf
 
 # 2. Code at $APP_DIR (clone on first run, fast-forward thereafter). Normalise
@@ -83,7 +83,7 @@ log "Installing systemd units"
 install -m 0644 "$DEPLOY_DIR/news-bot.service" \
                 "$DEPLOY_DIR/news-bot-deploy.service" \
                 "$DEPLOY_DIR/news-bot-deploy.timer" /etc/systemd/system/
-install -m 0644 "$DEPLOY_DIR/news-bot.tmpfiles" /etc/tmpfiles.d/news-bot.conf
+install -D -m 0644 "$DEPLOY_DIR/news-bot.tmpfiles" /etc/tmpfiles.d/news-bot.conf
 systemd-tmpfiles --create /etc/tmpfiles.d/news-bot.conf
 systemctl daemon-reload
 
