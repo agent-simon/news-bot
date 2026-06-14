@@ -6,7 +6,7 @@
 # errors. Stop the Pi's bot before a local run, then start it again when
 # you're done.
 #
-# Usage: scripts/pi-bot.sh {start|stop|restart|status}
+# Usage: scripts/pi-bot.sh {start|stop|restart|status|logs}
 # Reads PI_HOST=user@host from the repo's .env (or the environment).
 set -euo pipefail
 
@@ -35,8 +35,12 @@ case "${1:-}" in
     status)
         ssh "$PI_HOST" "systemctl status $SERVICE --no-pager"
         ;;
+    logs)
+        # -t: allocate a TTY so Ctrl-C cleanly stops the remote `journalctl -f`.
+        ssh -t "$PI_HOST" "journalctl -u $SERVICE -n 50 -f"
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}" >&2
+        echo "Usage: $0 {start|stop|restart|status|logs}" >&2
         exit 1
         ;;
 esac

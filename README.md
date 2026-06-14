@@ -29,7 +29,7 @@ uv run bot.py
 - Send `/news` to the bot for an on-demand summary of new items.
 - A daily summary is automatically sent to `CHAT_ID` at 08:00 server time.
 
-Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`make sync`, `make run`, `make pi-stop`/`pi-start`/`pi-status`, `make deploy`).
+Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`make sync`, `make run`, `make pi-stop`/`pi-start`/`pi-status`/`pi-logs`, `make deploy`).
 
 ## Running as a systemd service
 
