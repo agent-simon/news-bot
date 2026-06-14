@@ -1,20 +1,25 @@
-# Recommended systemd unit for the news bot.
+# Templated systemd unit for the news bot.
+#
+# The instance name (%i) is the Linux user the bot runs as, and its home is
+# assumed to hold the checkout at ~/work/news-bot. Enable it for your user —
+# e.g. for account "alice", `news-bot@alice.service` runs as alice from
+# /home/alice/work/news-bot. No per-host edits to this file are needed.
 #
 # Dependencies are managed with uv. Create the .venv before first start:
 #   uv sync
 #
-# Install on the Pi (adjust User= and the three paths to match your checkout):
-#   sudo cp deploy/news-bot.service /etc/systemd/system/news-bot.service
+# Install on the Pi (replace <user> with your account):
+#   sudo cp deploy/news-bot@.service /etc/systemd/system/news-bot@.service
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now news-bot.service
-#   systemctl status news-bot.service
-#   journalctl -u news-bot.service -f
+#   sudo systemctl enable --now news-bot@<user>.service
+#   systemctl status news-bot@<user>.service
+#   journalctl -u news-bot@<user>.service -f
 #
 # After a code update:
-#   git pull && uv sync && sudo systemctl restart news-bot.service
+#   git pull && uv sync && sudo systemctl restart news-bot@<user>.service
 
 [Unit]
-Description=News aggregator Telegram bot
+Description=News aggregator Telegram bot (%i)
 # Wait for real network connectivity before starting (the bot needs it at boot).
 After=network-online.target
 Wants=network-online.target
@@ -24,7 +29,8 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=youruser
+# %i is the instance name — run as that user, out of their home checkout.
+User=%i
 
 # Unbuffer Python stdout/stderr so print() output reaches the journal in real
 # time (otherwise it block-buffers when stdout isn't a terminal, and
@@ -33,15 +39,15 @@ Environment=PYTHONUNBUFFERED=1
 
 # WorkingDirectory is load-bearing: seen_links.db / seen_links.json and the .env
 # file are all resolved relative to it. Point it at the repo checkout.
-WorkingDirectory=/home/youruser/work/news-bot
+WorkingDirectory=/home/%i/work/news-bot
 
 # Run the uv-managed virtualenv interpreter directly — the service does no
 # dependency resolution at start (uv sync handles that at deploy time).
-ExecStart=/home/youruser/work/news-bot/.venv/bin/python /home/youruser/work/news-bot/bot.py
+ExecStart=/home/%i/work/news-bot/.venv/bin/python /home/%i/work/news-bot/bot.py
 
 # .env is loaded by python-dotenv from WorkingDirectory, so EnvironmentFile is
 # optional. Uncomment to also surface the vars to systemd itself:
-# EnvironmentFile=/home/youruser/work/news-bot/.env
+# EnvironmentFile=/home/%i/work/news-bot/.env
 
 # Keep the always-on bot running across crashes and clean exits alike. The
 # StartLimit* guard in [Unit] stops a fatal failure (bad token, broken pull)
@@ -57,7 +63,7 @@ PrivateTmp=true
 # Mount most of the filesystem read-only; ReadWritePaths below punches the
 # one hole it actually needs (db file, .env, logs if any).
 ProtectSystem=strict
-ReadWritePaths=/home/youruser/work/news-bot
+ReadWritePaths=/home/%i/work/news-bot
 # Block access to /home, /root, /run/user/* other than what's explicitly allowed.
 ProtectHome=true
 # No reason for a Telegram bot to load kernel modules, etc.

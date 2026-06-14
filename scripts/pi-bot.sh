@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start/stop/restart/check news-bot.service on the Raspberry Pi over SSH.
+# Start/stop/restart/check the news bot on the Raspberry Pi over SSH.
 #
 # Telegram allows only one getUpdates poller per bot token, so running the
 # bot locally while the Pi's instance is also polling causes Conflict
@@ -23,14 +23,15 @@ if [[ -z "${PI_HOST:-}" ]]; then
     exit 1
 fi
 
-SERVICE="news-bot.service"
-
+# The bot runs as the templated unit news-bot@<user>, where <user> is the Pi
+# login account. Resolve the instance on the Pi (id -un) so this works whatever
+# user PI_HOST points at.
 case "${1:-}" in
     start|stop|restart)
-        ssh "$PI_HOST" "sudo systemctl $1 $SERVICE && systemctl status $SERVICE --no-pager"
+        ssh "$PI_HOST" "s=news-bot@\$(id -un).service; sudo systemctl $1 \$s && systemctl status \$s --no-pager"
         ;;
     status)
-        ssh "$PI_HOST" "systemctl status $SERVICE --no-pager"
+        ssh "$PI_HOST" "s=news-bot@\$(id -un).service; systemctl status \$s --no-pager"
         ;;
     *)
         echo "Usage: $0 {start|stop|restart|status}" >&2
