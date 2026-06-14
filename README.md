@@ -51,7 +51,6 @@ sudo systemctl restart news-bot@<user>.service
 ```
 
 Notes:
-- **Migrating an existing install** from the old fixed-name units? Run [`scripts/migrate-to-templated-units.sh`](scripts/migrate-to-templated-units.sh) on the Pi (as the bot user) — it tears down `news-bot.service` + `news-bot-deploy.{service,timer}`, installs the `@`-templated units, refreshes the sudoers snippet, and enables the new instances. Idempotent.
 - **The template assumes the checkout is at `~/work/news-bot`** for the enabled user (that's where `WorkingDirectory` points). `.env` and the `seen_links.db` dedup store are resolved relative to it; clone there, or edit the paths in `deploy/news-bot@.service`.
 - `seen_links.db` (and a legacy `seen_links.json`) are runtime state, written to `WorkingDirectory`; they're gitignored.
 - The daily job fires at **08:00 server time** — check the host timezone with `timedatectl`.
