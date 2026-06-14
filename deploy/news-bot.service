@@ -1,25 +1,24 @@
-# Templated systemd unit for the news bot.
+# systemd unit for the news bot.
 #
-# The instance name (%i) is the Linux user the bot runs as, and its home is
-# assumed to hold the checkout at ~/work/news-bot. Enable it for your user —
-# e.g. for account "alice", `news-bot@alice.service` runs as alice from
-# /home/alice/work/news-bot. No per-host edits to this file are needed.
+# Runs as the dedicated, unprivileged `newsbot` system account out of
+# /opt/news-bot (the application's home). See README's "Running as a systemd
+# service" section for the one-time account/dir setup.
 #
 # Dependencies are managed with uv. Create the .venv before first start:
 #   uv sync
 #
-# Install on the Pi (replace <user> with your account):
-#   sudo cp deploy/news-bot@.service /etc/systemd/system/news-bot@.service
+# Install on the Pi:
+#   sudo cp deploy/news-bot.service /etc/systemd/system/news-bot.service
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now news-bot@<user>.service
-#   systemctl status news-bot@<user>.service
-#   journalctl -u news-bot@<user>.service -f
+#   sudo systemctl enable --now news-bot.service
+#   systemctl status news-bot.service
+#   journalctl -u news-bot.service -f
 #
-# After a code update:
-#   git pull && uv sync && sudo systemctl restart news-bot@<user>.service
+# After a code update (auto-deploy does this for you):
+#   git pull && uv sync && sudo systemctl restart news-bot.service
 
 [Unit]
-Description=News aggregator Telegram bot (%i)
+Description=News aggregator Telegram bot
 # Wait for real network connectivity before starting (the bot needs it at boot).
 After=network-online.target
 Wants=network-online.target
@@ -29,8 +28,9 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-# %i is the instance name — run as that user, out of their home checkout.
-User=%i
+# Dedicated unprivileged service account (no login shell). Its home is the app
+# dir, so tools like uv have a writable HOME for their caches.
+User=newsbot
 
 # Unbuffer Python stdout/stderr so print() output reaches the journal in real
 # time (otherwise it block-buffers when stdout isn't a terminal, and
@@ -38,16 +38,16 @@ User=%i
 Environment=PYTHONUNBUFFERED=1
 
 # WorkingDirectory is load-bearing: seen_links.db / seen_links.json and the .env
-# file are all resolved relative to it. Point it at the repo checkout.
-WorkingDirectory=/home/%i/work/news-bot
+# file are all resolved relative to it.
+WorkingDirectory=/opt/news-bot
 
 # Run the uv-managed virtualenv interpreter directly — the service does no
 # dependency resolution at start (uv sync handles that at deploy time).
-ExecStart=/home/%i/work/news-bot/.venv/bin/python /home/%i/work/news-bot/bot.py
+ExecStart=/opt/news-bot/.venv/bin/python /opt/news-bot/bot.py
 
 # .env is loaded by python-dotenv from WorkingDirectory, so EnvironmentFile is
 # optional. Uncomment to also surface the vars to systemd itself:
-# EnvironmentFile=/home/%i/work/news-bot/.env
+# EnvironmentFile=/opt/news-bot/.env
 
 # Keep the always-on bot running across crashes and clean exits alike. The
 # StartLimit* guard in [Unit] stops a fatal failure (bad token, broken pull)
@@ -61,16 +61,13 @@ NoNewPrivileges=true
 # Give it a private /tmp, isolated from the rest of the system.
 PrivateTmp=true
 # Mount most of the filesystem read-only; ReadWritePaths below punches the
-# one hole it actually needs (db file, .env, logs if any).
+# one hole it actually needs (the checkout, for seen_links.db).
 ProtectSystem=strict
-ReadWritePaths=/home/%i/work/news-bot
-# Make /home, /root, /run/user/* read-only (not fully hidden): the bot runs out
-# of /home/%i/work/news-bot and its venv interpreter is reached via that path,
-# so the home tree must stay visible. ReadWritePaths above re-grants write to
-# just the checkout (for seen_links.db). NOTE: ProtectHome=true (fully hidden)
-# breaks ExecStart here with status=203/EXEC — the ReadWritePaths hole isn't
-# enough for systemd to resolve the interpreter path under a hidden /home.
-ProtectHome=read-only
+ReadWritePaths=/opt/news-bot
+# Fully hide /home, /root, /run/user/* from the service. Safe now that the app
+# lives in /opt rather than a home dir (this is what broke the old templated
+# unit with status=203/EXEC when the interpreter lived under /home).
+ProtectHome=true
 # No reason for a Telegram bot to load kernel modules, etc.
 ProtectKernelModules=true
 ProtectKernelLogs=true
