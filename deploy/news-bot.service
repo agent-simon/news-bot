@@ -72,8 +72,30 @@ ProtectHome=true
 ProtectKernelModules=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
+ProtectKernelTunables=true
 # Restrict to standard internet address families only.
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# The bot needs no Linux capabilities at all (non-root, no privileged ops),
+# so drop the entire bounding set.
+CapabilityBoundingSet=
+# Allow only the normal service syscall set, on the native ABI only.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+# Forbid a pile of things the bot never does (each closes a systemd-analyze
+# "may ..." finding with no functional cost for an outbound HTTP bot).
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+PrivateDevices=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RemoveIPC=true
+# Files the service creates (e.g. seen_links.db) are owner-only, not world-readable.
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
