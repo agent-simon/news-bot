@@ -101,6 +101,8 @@ Notes:
 
 [`deploy/auto-deploy.sh`](deploy/auto-deploy.sh) pulls `origin/main`, and if there are new commits, runs `uv sync` and restarts `news-bot.service`. It's a no-op (exit 0) when already up to date, and refuses to run if the checkout has local changes. [`deploy/news-bot-deploy.timer`](deploy/news-bot-deploy.timer) runs it every 15 minutes via [`deploy/news-bot-deploy.service`](deploy/news-bot-deploy.service) (oneshot), both also running as `newsbot`.
 
+Auto-deploy updates **code only** — it does not install changed systemd unit files into `/etc/systemd/system` (it runs as the unprivileged `newsbot` account by design, and granting it root unit-installs would be a privilege-escalation path). When an update touches a unit file it logs a `WARNING` to the journal; apply it by re-running `deploy/install.sh` (or `cp`-ing the unit + `daemon-reload`) as root.
+
 The restart needs passwordless `sudo`. Create `/etc/sudoers.d/news-bot-deploy` (via `sudo visudo -f /etc/sudoers.d/news-bot-deploy`, so it's syntax-checked). Two lines, least-privilege: `newsbot` (the deploy account) gets only `restart`; your login user — replace `<you>` — gets `start`/`stop`/`restart` for [`scripts/pi-bot.sh`](scripts/pi-bot.sh) plus `start news-bot-deploy.service` to trigger a deploy on demand via [`scripts/pi-deploy.sh`](scripts/pi-deploy.sh):
 
 ```
