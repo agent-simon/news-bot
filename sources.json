@@ -12,7 +12,8 @@
   	{"url":"https://www.wired.com/feed/tag/ai/latest/rss","limit":1,"name":"WIRED"},
     {"url":"https://techcrunch.com/feed/","limit":1,"name":"TechCrunch"},
   	{"url":"https://news.google.com/rss/search?q=%22AI+test+automation%22+OR+%22AI+QA%22+OR+%22software+testing%22+AI","limit":2,"name":"Google News QA AI"},
-    {"url":"https://blogs.nvidia.com/feed/","limit":1,"name":"NVIDIA"}
+    {"url":"https://blogs.nvidia.com/feed/","limit":1,"name":"NVIDIA"},
+  	{"url":"https://archlinux.org/feeds/news/","limit":1,"name":"Arch Linux News"}
   ],
   "known_source_names": {
     "github.com": "GitHub",
