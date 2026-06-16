@@ -32,7 +32,11 @@ ai = Anthropic()
 #   "known_source_names" — display labels for web-search hosts (netloc sans www.)
 #   "base_topics"        — fixed topics every web search covers
 #   "search_themes"      — extra topics /news mixes in at random
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "sources.json")
+# Set SOURCES_PATH in .env to read from a file outside the git checkout (e.g. an
+# untracked sources.local.json on the Pi) so feeds/topics can be edited in place
+# without a commit/PR/deploy — still read fresh each run. Falls back to the
+# tracked sources.json (the default config + template) when unset/empty.
+CONFIG_PATH = os.environ.get("SOURCES_PATH", "").strip() or os.path.join(os.path.dirname(__file__), "sources.json")
 
 # How many search_themes /news samples per run (behaviour knob, not data).
 THEMES_PER_RUN = 2
