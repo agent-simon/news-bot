@@ -55,10 +55,14 @@ async def _send(send, entries):
     """Send the rendered entries in Telegram-sized chunks, marking each chunk's
     items seen as soon as it's delivered. On a mid-batch failure the already-sent
     items stay marked (no re-post) while the undelivered ones re-surface next run."""
-    for text, links in _chunks(entries):
+    chunks = _chunks(entries)
+    sent_items = 0
+    for text, links in chunks:
         await send(text, parse_mode="HTML", disable_web_page_preview=True)
         if links:
             await asyncio.to_thread(mark_seen, links)
+            sent_items += len(links)
+    logger.info("Delivered %d item(s) in %d message chunk(s)", sent_items, len(chunks))
 
 FETCH_FAILED_MESSAGE = "⚠️ Failed to fetch the news. Please try again later."
 

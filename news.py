@@ -4,6 +4,7 @@ load_dotenv()
 
 import html
 import json
+import logging
 import os
 import random
 import re
@@ -12,6 +13,8 @@ from anthropic import Anthropic
 from dedup import load_seen, normalize
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 MAX_AGE_DAYS = 3
 
@@ -81,7 +84,8 @@ def fetch_new_items():
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)
 
-    for source in load_config()["sources"]:
+    sources = load_config()["sources"]
+    for source in sources:
         feed = feedparser.parse(source["url"])
         added = 0
         for entry in feed.entries[:source["limit"]]:
@@ -94,9 +98,9 @@ def fetch_new_items():
                     continue
             items.append({"title": entry.title, "link": entry.link, "summary": entry.get("summary", ""), "source": source["name"]})
             added += 1
-        print(f"{source['url']} -> added {added}")
+        logger.info("RSS %s -> %d new", source["name"], added)
 
-    print(f"Total new items: {len(items)}")
+    logger.info("RSS: %d new item(s) across %d feed(s)", len(items), len(sources))
     return items
 
 def _parse_page_age(page_age):
@@ -171,7 +175,7 @@ def _web_search(instruction):
         _merge_ages(ages, _search_result_ages(response.content))
 
     if response.stop_reason == "max_tokens":
-        print("web search: response truncated at max_tokens; results may be incomplete")
+        logger.warning("web search: response truncated at max_tokens; results may be incomplete")
 
     text_blocks = [block.text for block in response.content if block.type == "text"]
     if not text_blocks:
@@ -179,7 +183,7 @@ def _web_search(instruction):
     try:
         return _extract_json(text_blocks[-1]), ages
     except json.JSONDecodeError:
-        print("web search: could not parse response as JSON")
+        logger.warning("web search: could not parse response as JSON")
         return [], ages
 
 
@@ -207,9 +211,9 @@ def _results_to_items(results, seen, known_names, ages, cutoff):
             continue
         items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link, known_names)})
     if dropped_invented:
-        print(f"web search: dropped {dropped_invented} item(s) with links not in search results")
+        logger.info("web search: dropped %d item(s) with links not in search results", dropped_invented)
     if dropped_stale:
-        print(f"web search: dropped {dropped_stale} item(s) older than cutoff")
+        logger.info("web search: dropped %d item(s) older than cutoff", dropped_stale)
     return items
 
 def search_web(include_themes=False):
@@ -240,7 +244,7 @@ def search_web(include_themes=False):
         "\"link\" (the source URL) and \"summary\" (1-2 sentences)."
     )
     items = _results_to_items(results, seen, config["known_source_names"], ages, cutoff)
-    print(f"Web search ({len(topics)} topics) -> added {len(items)}")
+    logger.info("Web search: %d new item(s) across %d topic(s)", len(items), len(topics))
     return items
 
 
@@ -249,16 +253,22 @@ def collect_new_items(include_themes=False):
     link. Does not persist; caller marks items seen after delivery. When
     include_themes is set, the web search also covers random search_themes
     (used by the on-demand /news)."""
-    sources = fetch_new_items() + search_web(include_themes)
+    rss = fetch_new_items()
+    web = search_web(include_themes)
 
     items = []
     picked = set()
-    for item in sources:
+    for item in rss + web:
         key = normalize(item["link"])
         if key in picked:
             continue
         picked.add(key)
         items.append(item)
+
+    logger.info(
+        "Collected %d new item(s): RSS %d + web %d, %d cross-source duplicate(s) dropped",
+        len(items), len(rss), len(web), len(rss) + len(web) - len(items),
+    )
     return items
 
 
@@ -320,7 +330,7 @@ def summarize(items):
         results = _extract_json(msg.content[0].text)
     except json.JSONDecodeError:
         # Never leak raw model output to Telegram — render from local items.
-        print("summarize: could not parse response as JSON; using raw items")
+        logger.warning("summarize: could not parse response as JSON; using raw items")
         return _render(items, {})
 
     enrichments = {}
