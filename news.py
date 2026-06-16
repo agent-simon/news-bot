@@ -37,6 +37,13 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "sources.json")
 # How many search_themes /news samples per run (behaviour knob, not data).
 THEMES_PER_RUN = 2
 
+# Claude web-search toggle. On by default (incl. unset/empty); set WEB_SEARCH to
+# a falsey value (off/false/0/no) in .env to skip the web-search pass and rely on
+# RSS feeds only. That drops the Sonnet + web-search-tool spend (by far the bulk
+# of the API cost), leaving just the cheap Haiku summary call. Both the daily job
+# and /news respect it.
+WEB_SEARCH_ENABLED = os.environ.get("WEB_SEARCH", "").strip().lower() not in {"off", "false", "0", "no", "disabled"}
+
 def load_config():
     """Read sources.json fresh (CWD-independent), so config edits apply without
     a restart."""
@@ -219,7 +226,11 @@ def _results_to_items(results, seen, known_names, ages, cutoff):
 def search_web(include_themes=False):
     """One web search covering the fixed base_topics, plus (on /news) a random
     sample of search_themes. Single call keeps token/search cost down vs one
-    request per topic group."""
+    request per topic group. Disabled wholesale via WEB_SEARCH=off (RSS only)."""
+    if not WEB_SEARCH_ENABLED:
+        logger.info("Web search disabled via WEB_SEARCH; RSS feeds only.")
+        return []
+
     config = load_config()
     seen = load_seen()
     cutoff = datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)
