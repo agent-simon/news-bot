@@ -11,3 +11,6 @@ __pycache__/
 seen_links.json
 seen_links.db
 seen_links.db-*
+
+# Local feed/topic override (SOURCES_PATH) — edited in place, not version-controlled
+sources.local.json
