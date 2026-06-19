@@ -41,9 +41,10 @@ Environment=PYTHONUNBUFFERED=1
 # file are all resolved relative to it.
 WorkingDirectory=/opt/news-bot
 
-# Run the uv-managed virtualenv interpreter directly — the service does no
-# dependency resolution at start (uv sync handles that at deploy time).
-ExecStart=/opt/news-bot/.venv/bin/python /opt/news-bot/bot.py
+# Run the `news-bot` console script from the uv-managed virtualenv — the service
+# does no dependency resolution at start (uv sync installs the package + this
+# entrypoint at deploy time). Equivalent to `.venv/bin/python -m newsbot`.
+ExecStart=/opt/news-bot/.venv/bin/news-bot
 
 # .env is loaded by python-dotenv from WorkingDirectory, so EnvironmentFile is
 # optional. Uncomment to also surface the vars to systemd itself:

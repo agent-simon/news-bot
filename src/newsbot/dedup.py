@@ -2,8 +2,8 @@
 import json
 import os
 import sqlite3
-from datetime import datetime, timedelta, timezone
-from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 DB_FILE = "seen_links.db"
 LEGACY_JSON_FILE = "seen_links.json"
@@ -51,7 +51,7 @@ def _migrate_legacy_json(conn):
             links = json.load(f)
     except (json.JSONDecodeError, OSError):
         return
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     conn.executemany(
         "INSERT OR IGNORE INTO seen (link, first_seen) VALUES (?, ?)",
         [(normalize(link), now) for link in links],
@@ -60,7 +60,7 @@ def _migrate_legacy_json(conn):
 
 
 def _prune(conn):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)).isoformat()
+    cutoff = (datetime.now(UTC) - timedelta(days=RETENTION_DAYS)).isoformat()
     conn.execute("DELETE FROM seen WHERE first_seen < ?", (cutoff,))
     conn.commit()
 
@@ -77,7 +77,7 @@ def load_seen():
 
 def mark_seen(links):
     """Persist links as seen (normalized, timestamped). Idempotent."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     conn = _connect()
     try:
         conn.executemany(

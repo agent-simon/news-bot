@@ -15,8 +15,8 @@ help: ## List available targets
 sync: ## Create/update the .venv from uv.lock
 	uv sync
 
-run: ## Run the bot locally (uv run bot.py)
-	uv run bot.py
+run: ## Run the bot locally (uv run news-bot)
+	uv run news-bot
 
 pi-start: ## Start the bot's service on the Pi
 	scripts/pi-bot.sh start

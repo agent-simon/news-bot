@@ -23,8 +23,12 @@ cp .shadow.env .env
 ## Running
 
 ```bash
-uv run bot.py
+uv run news-bot
 ```
+
+(The code lives in the `newsbot` package under `src/`; `uv sync` installs the
+`news-bot` console script. `uv run python -m newsbot` works too, as does the
+legacy `uv run python bot.py` via a thin root shim.)
 
 - Send `/news` to the bot for an on-demand summary of new items.
 - A daily summary is automatically sent to `CHAT_ID` at 08:00 server time.
@@ -33,7 +37,9 @@ Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`m
 
 ## Running as a systemd service
 
-The bot runs as [`deploy/news-bot.service`](deploy/news-bot.service) under a dedicated, unprivileged `newsbot` system account, out of `/opt/news-bot` (the conventional home for a self-contained app, kept off your login user's home and privileges). The unit runs the uv-managed interpreter (`.venv/bin/python`) directly, so the service does no dependency resolution at start.
+The bot runs as [`deploy/news-bot.service`](deploy/news-bot.service) under a dedicated, unprivileged `newsbot` system account, out of `/opt/news-bot` (the conventional home for a self-contained app, kept off your login user's home and privileges). The unit runs the uv-installed `news-bot` console script (`.venv/bin/news-bot`) directly, so the service does no dependency resolution at start.
+
+> **Upgrading an existing Pi to the `src/` layout:** the `ExecStart` changed from `…/python …/bot.py` to `…/.venv/bin/news-bot`. Auto-deploy does **not** reinstall unit files, so after the first pull that includes this change, re-run `sudo /opt/news-bot/deploy/install.sh` to apply the new unit. Until then the service keeps running via the root `bot.py` shim, so there's no downtime.
 
 **Prerequisites:** `git` and [uv](https://docs.astral.sh/uv/). Install uv (the installer puts it in `~/.local/bin`; the install script copies it system-wide for the `newsbot` account):
 
@@ -145,6 +151,6 @@ To develop locally without disrupting the Pi, either:
 
 ## Configuration
 
-RSS/Atom sources and search topics live in [`sources.json`](sources.json) (edit feeds and topics there). Each `sources` entry has a feed `url`, a `limit` on how many items to consider per run, and a display `name`. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`, a SQLite store) are skipped. Links are committed as seen only after the summary is successfully delivered, so a failed run re-surfaces its items next time.
+RSS/Atom sources and search topics live in [`src/newsbot/sources.json`](src/newsbot/sources.json) (edit feeds and topics there). Each `sources` entry has a feed `url`, a `limit` on how many items to consider per run, and a display `name`. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`, a SQLite store) are skipped. Links are committed as seen only after the summary is successfully delivered, so a failed run re-surfaces its items next time.
 
 In addition to the RSS sources, Claude performs its own web search each run (`search_web()`) over the `base_topics` from `sources.json` to find recent items on the same topics, which are merged in before summarizing. On the on-demand `/news` command it also mixes in a random sample of `search_themes` for variety.
