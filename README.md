@@ -1,6 +1,6 @@
 # news-bot
 
-A Telegram bot that aggregates news on Playwright/E2E testing and AI test automation, summarizes new items with Claude, and posts the summary to a Telegram chat — on demand via `/news` or automatically every day at 08:00.
+A Telegram bot that aggregates news on Playwright/E2E testing and AI test automation, summarizes new items with OpenAI, and posts the summary to a Telegram chat — on demand via `/news` or automatically every day at 08:00.
 
 ## Setup
 
@@ -17,7 +17,7 @@ cp .shadow.env .env
 ```
 
 - `TELEGRAM_BOT_TOKEN` — token for your Telegram bot (from [@BotFather](https://t.me/BotFather))
-- `ANTHROPIC_API_KEY` — Anthropic API key
+- `OPENAI_API_KEY` — OpenAI API key
 - `CHAT_ID` — Telegram chat ID to receive the daily summary
 
 ## Running
@@ -54,7 +54,7 @@ sudo git clone https://github.com/agent-simon/news-bot.git /opt/news-bot
 sudo /opt/news-bot/deploy/install.sh
 ```
 
-[`deploy/install.sh`](deploy/install.sh) is idempotent (safe to re-run) and does everything below: creates the `newsbot` account, builds the venv, installs the units + sudoers, and enables the service and auto-deploy timer. It configures the system from the **currently checked-out code** — it does not pull (updating the code is `git pull` / auto-deploy's job), so to apply newer unit files, `git pull` first and then re-run it. On the **first** run it seeds `.env` from `.shadow.env` and stops so you can fill in your tokens — edit `/opt/news-bot/.env` (`TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY`, `CHAT_ID`), then run the script again to finish. Then:
+ [`deploy/install.sh`](deploy/install.sh) is idempotent (safe to re-run) and does everything below: creates the `newsbot` account, builds the venv, installs the units + sudoers, and enables the service and auto-deploy timer. It configures the system from the **currently checked-out code** — it does not pull (updating the code is `git pull` / auto-deploy's job), so to apply newer unit files, `git pull` first and then re-run it. On the **first** run it seeds `.env` from `.shadow.env` and stops so you can fill in your tokens — edit `/opt/news-bot/.env` (`TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `CHAT_ID`), then run the script again to finish. Then:
 
 ```bash
 systemctl status news-bot.service
@@ -140,7 +140,7 @@ Telegram only allows **one active poller per bot token** — running the same bo
 
 To develop locally without disrupting the Pi, either:
 
-- **Use a separate dev bot** — create a second bot via [@BotFather](https://t.me/BotFather), and in your local `.env` set `TELEGRAM_BOT_TOKEN` to its token. You can reuse the same `CHAT_ID` (add the dev bot to that chat) or point `CHAT_ID` at a separate test chat. `ANTHROPIC_API_KEY` and `sources.json` can stay the same — only the bot identity differs.
+- **Use a separate dev bot** — create a second bot via [@BotFather](https://t.me/BotFather), and in your local `.env` set `TELEGRAM_BOT_TOKEN` to its token. You can reuse the same `CHAT_ID` (add the dev bot to that chat) or point `CHAT_ID` at a separate test chat. `OPENAI_API_KEY` and `sources.json` can stay the same — only the bot identity differs.
 - **Stop the Pi's bot while you work** — [`scripts/pi-bot.sh`](scripts/pi-bot.sh) SSHes into the Pi to stop/start/restart `news-bot.service`:
   ```bash
   scripts/pi-bot.sh stop      # before running locally with the same token
@@ -153,4 +153,4 @@ To develop locally without disrupting the Pi, either:
 
 RSS/Atom sources and search topics live in [`src/newsbot/sources.json`](src/newsbot/sources.json) (edit feeds and topics there). Each `sources` entry has a feed `url`, a `limit` on how many items to consider per run, and a display `name`. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`, a SQLite store) are skipped. Links are committed as seen only after the summary is successfully delivered, so a failed run re-surfaces its items next time.
 
-In addition to the RSS sources, Claude performs its own web search each run (`search_web()`) over the `base_topics` from `sources.json` to find recent items on the same topics, which are merged in before summarizing. On the on-demand `/news` command it also mixes in a random sample of `search_themes` for variety.
+In addition to the RSS sources, OpenAI performs its own web search each run (`search_web()`) over the `base_topics` from `sources.json` to find recent items on the same topics, which are merged in before summarizing. On the on-demand `/news` command it also mixes in a random sample of `search_themes` for variety.

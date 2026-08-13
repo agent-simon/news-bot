@@ -1,23 +1,70 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace as NS
 
-from newsbot.websearch import _parse_page_age, _results_to_items, _source_name
-
-
-def test_parse_page_age_relative_days():
-    parsed = _parse_page_age("2 days ago")
-    assert parsed is not None
-    assert (datetime.now(UTC) - parsed).days == 2
-
-
-def test_parse_page_age_absolute():
-    assert _parse_page_age("2026-01-15") == datetime(2026, 1, 15, tzinfo=UTC)
-    assert _parse_page_age("January 15, 2026") == datetime(2026, 1, 15, tzinfo=UTC)
+from newsbot.websearch import (
+    _parse_published_date,
+    _results_to_items,
+    _search_source_urls,
+    _source_name,
+    _web_search,
+)
 
 
-def test_parse_page_age_unknown_returns_none():
-    assert _parse_page_age("") is None
-    assert _parse_page_age(None) is None
-    assert _parse_page_age("sometime last spring") is None
+def test_parse_published_date_accepts_iso_values():
+    assert _parse_published_date("2026-01-15") == datetime(2026, 1, 15, tzinfo=UTC)
+    assert _parse_published_date("2026-01-15T12:30:00Z") == datetime(2026, 1, 15, 12, 30, tzinfo=UTC)
+
+
+def test_parse_published_date_rejects_unknown_values():
+    assert _parse_published_date("") is None
+    assert _parse_published_date(None) is None
+    assert _parse_published_date("sometime last spring") is None
+
+
+def test_search_source_urls_reads_sources_and_citations():
+    response = NS(output=[
+        NS(type="web_search_call", action=NS(
+            type="search",
+            sources=[NS(url="https://www.example.com/article?utm_source=x")],
+        )),
+        NS(type="web_search_call", action=NS(type="open_page", url="https://other.org/page")),
+        NS(type="message", content=[NS(type="output_text", annotations=[
+            NS(type="url_citation", url="https://example.com/article"),
+        ])]),
+    ])
+    assert _search_source_urls(response) == {"https://example.com/article", "https://other.org/page"}
+
+
+def test_web_search_uses_openai_responses_web_search(monkeypatch):
+    calls = []
+    text = '{"items":[{"title":"Release","link":"https://example.com/a","summary":"s","published_date":"2026-08-12"}]}'
+    response = NS(
+        status="completed",
+        output_text=text,
+        output=[
+            NS(type="web_search_call", action=NS(
+                type="search", sources=[NS(url="https://example.com/a")]
+            )),
+            NS(type="message", phase="final_answer", content=[NS(
+                type="output_text", text=text, annotations=[]
+            )]),
+        ],
+    )
+
+    class Responses:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return response
+
+    monkeypatch.setattr("newsbot.websearch.get_client", lambda: NS(responses=Responses()))
+    results, ages = _web_search("find recent news")
+    assert results[0]["title"] == "Release"
+    assert ages["https://example.com/a"] == datetime(2026, 8, 12, tzinfo=UTC)
+    assert calls[0]["model"] == "gpt-5.5"
+    assert calls[0]["tool_choice"] == "required"
+    assert calls[0]["tools"] == [{"type": "web_search", "search_context_size": "medium"}]
+    assert calls[0]["include"] == ["web_search_call.action.sources"]
+    assert calls[0]["text"]["format"]["type"] == "json_schema"
 
 
 def test_source_name_uses_known_label_else_netloc():
@@ -41,7 +88,7 @@ def test_results_to_items_drops_invented_and_stale():
     }
     items = _results_to_items(results, seen=set(), known_names={}, ages=ages, cutoff=cutoff)
     titles = [i["title"] for i in items]
-    assert titles == ["Real fresh", "Unknown date"]
+    assert titles == ["Real fresh"]
 
 
 def test_results_to_items_skips_seen():

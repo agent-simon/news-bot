@@ -30,8 +30,8 @@ def _env_flag(name):
 
 
 def web_search_enabled():
-    """Claude web-search pass. Off (RSS only) drops the Sonnet + web-search-tool
-    spend, by far the bulk of the API cost. Respected by the daily job and /news."""
+    """OpenAI web-search pass. Off selects RSS-only mode. Respected by both
+    the daily job and /news."""
     return _env_flag("WEB_SEARCH")
 
 
