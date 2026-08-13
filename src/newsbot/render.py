@@ -6,7 +6,7 @@ import html
 import json
 import logging
 
-from .llm import SUMMARY_MODEL, get_client
+from .llm import SUMMARY_MODEL, get_client, response_text
 from .parsing import coerce_index, extract_json
 
 logger = logging.getLogger(__name__)
@@ -51,33 +51,76 @@ def summarize(items):
         f"Item {idx}:\nTitle: {i['title']}\nRaw: {i['summary'][:300]}"
         for idx, i in enumerate(items)
     )
-    msg = get_client().messages.create(
+    response = get_client().responses.create(
         model=SUMMARY_MODEL,
-        max_tokens=4000,
-        messages=[{
+        reasoning={"effort": "none"},
+        max_output_tokens=4000,
+        store=False,
+        input=[{
             "role": "user",
             "content": (
                 "For each item below, write a 1-2 sentence summary based on the title "
                 "(the raw content may be sparse) and pick one emoji that fits its topic. "
                 "Include ALL items, even if the raw content is empty — infer from the title.\n\n"
-                "Respond with ONLY a JSON array (no markdown, no commentary), where each "
-                "element is {\"i\": <the item number as an integer>, \"emoji\": ..., \"summary\": ...}.\n\n"
+                "Respond with ONLY a JSON object containing an \"items\" array. Each "
+                "item must be {\"i\": <integer>, \"emoji\": <string>, \"summary\": <string>}.\n\n"
                 f"{text_blob}"
             )
-        }]
+        }],
+        text={
+            "format": {
+                "type": "json_schema",
+                "name": "news_summaries",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "i": {"type": "integer", "minimum": 0},
+                                    "emoji": {"type": "string"},
+                                    "summary": {"type": "string"},
+                                },
+                                "required": ["i", "emoji", "summary"],
+                                "additionalProperties": False,
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                    "additionalProperties": False,
+                },
+            }
+        },
     )
 
+    text = response_text(response)
+    if not text:
+        logger.warning("summarize: response had no usable output; using raw items")
+        return _render(items, {})
     try:
-        results = extract_json(msg.content[0].text)
+        payload = extract_json(text)
     except json.JSONDecodeError:
         # Never leak raw model output to Telegram — render from local items.
         logger.warning("summarize: could not parse response as JSON; using raw items")
         return _render(items, {})
 
+    results = payload.get("items", []) if isinstance(payload, dict) else payload
+    if not isinstance(results, list):
+        return _render(items, {})
     enrichments = {}
     for r in results:
+        if not isinstance(r, dict):
+            continue
         idx = coerce_index(r.get("i"))
-        if idx is not None:
-            enrichments[idx] = {"emoji": r.get("emoji"), "summary": r.get("summary")}
+        if idx is not None and 0 <= idx < len(items):
+            emoji = r.get("emoji")
+            summary = r.get("summary")
+            enrichments[idx] = {
+                "emoji": emoji if isinstance(emoji, str) else None,
+                "summary": summary if isinstance(summary, str) else None,
+            }
 
     return _render(items, enrichments)

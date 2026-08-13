@@ -52,7 +52,7 @@ chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 #    template and stop so the operator can fill in secrets, then re-run.
 if [[ ! -f "$APP_DIR/.env" ]]; then
     install -m 0640 -o "$APP_USER" -g "$APP_USER" "$APP_DIR/.shadow.env" "$APP_DIR/.env"
-    die "seeded $APP_DIR/.env — fill in TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY, CHAT_ID, then re-run $0"
+    die "seeded $APP_DIR/.env — fill in TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, CHAT_ID, then re-run $0"
 fi
 
 # 4. uv must be on a system-wide PATH so $APP_USER (not just you) can run it.
