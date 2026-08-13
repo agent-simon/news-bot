@@ -1,5 +1,9 @@
 # Repository Instructions
 
+## Workflow
+
+- Before making any repository changes, check out a new branch first.
+
 ## Commands
 
 - Use `uv sync` to create/update the locked `.venv` and install dev tools.

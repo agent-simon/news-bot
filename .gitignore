@@ -2,6 +2,7 @@
 .env
 venv/
 .venv/
+.vscode/
 
 # Python
 __pycache__/
