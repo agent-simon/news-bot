@@ -16,6 +16,7 @@
 
 - Application code is the `newsbot` package under `src/newsbot/`; the console entrypoint is `newsbot.bot:main`.
 - `pipeline.collect_new_items()` combines RSS and one Claude web-search pass; `render.summarize()` calls Claude for summaries; `bot._send()` delivers Telegram-sized chunks.
+- `bot.py` at the repository root is a compatibility shim, not the application implementation.
 - Tests cover pure helpers only and require no network or API credentials; pytest adds `src` to `PYTHONPATH` via `pyproject.toml`.
 
 ## Configuration And State
@@ -25,10 +26,18 @@
 - Edit `src/newsbot/sources.json` for tracked feeds/topics. Do not edit or commit `seen_links.db`/`seen_links.json`; they are runtime dedup state.
 - Items are marked seen only after their Telegram chunk is delivered, so do not move dedup marking earlier without preserving retry behavior.
 
+## Architecture Details
+
+- `bot.py` registers `/news` and the optional daily 08:00 US/Eastern job, then collects, summarizes, chunks, and sends messages.
+- `config.py` reads environment flags and the feed/topic JSON on each call; `SOURCES_PATH` overrides the package-relative `sources.json`.
+- `rss.py` reads configured feeds without persisting dedup state; `websearch.py` performs one Claude web-search pass and filters invented or stale links.
+- `pipeline.py` deduplicates RSS and web-search candidates; `render.py` keeps titles and links local while Claude supplies emoji and summaries.
+- `dedup.py` stores normalized seen links in SQLite with 14-day retention and migrates legacy `seen_links.json` on first connection.
+
 ## Operational Constraints
 
 - Telegram permits one active poller per bot token. Before a local run using the Pi token, stop the Pi with `scripts/pi-bot.sh stop`, or use a separate development bot; restart it afterward.
 - `deploy/auto-deploy.sh` refuses dirty checkouts, fast-forwards `origin/main`, runs `uv sync`, and restarts the service. It does not install changed systemd units; rerun `sudo deploy/install.sh` for unit changes.
 - `scripts/pi-deploy.sh` is the supported immediate remote deploy trigger; it starts the deploy oneshot so deployment runs as the `newsbot` checkout owner.
 
-See `CLAUDE.md` and `README.md` for the detailed architecture and systemd setup.
+See `README.md` for detailed local development, systemd, and deployment procedures.
