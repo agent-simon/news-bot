@@ -12,7 +12,14 @@ import random
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
-from .config import MAX_AGE_DAYS, THEMES_PER_RUN, load_config, web_search_enabled
+from .config import (
+    MAX_AGE_DAYS,
+    MAX_SUMMARY_LENGTH,
+    SUMMARY_PATTERN,
+    THEMES_PER_RUN,
+    load_config,
+    web_search_enabled,
+)
 from .dedup import load_seen, normalize
 from .llm import SEARCH_MODEL, get_client, response_text
 from .parsing import extract_json
@@ -99,7 +106,7 @@ def _web_search(instruction):
                                 "properties": {
                                     "title": {"type": "string"},
                                     "link": {"type": "string"},
-                                    "summary": {"type": "string"},
+                                    "summary": {"type": "string", "pattern": SUMMARY_PATTERN},
                                     "published_date": {"type": "string"},
                                 },
                                 "required": ["title", "link", "summary", "published_date"],
@@ -167,7 +174,10 @@ def _results_to_items(results, seen, known_names, ages, cutoff):
         if date < cutoff or date > datetime.now(UTC):
             dropped_stale += 1
             continue
-        items.append({"title": result.get("title", ""), "link": link, "summary": result.get("summary", ""), "source": _source_name(link, known_names)})
+        summary = result.get("summary", "")
+        if isinstance(summary, str) and len(summary) > MAX_SUMMARY_LENGTH:
+            summary = summary[:MAX_SUMMARY_LENGTH - 1].rstrip() + "…"
+        items.append({"title": result.get("title", ""), "link": link, "summary": summary, "source": _source_name(link, known_names)})
     if dropped_invented:
         logger.info("web search: dropped %d item(s) with links not in search results", dropped_invented)
     if dropped_stale:

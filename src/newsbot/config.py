@@ -16,6 +16,13 @@ load_dotenv()
 # Skip items older than this (days). Applied to both RSS and dated web results.
 MAX_AGE_DAYS = 3
 
+# Bounds for text that can be returned by a model or feed and displayed in
+# Telegram messages. Structured-output patterns use the same values.
+MAX_EMOJI_LENGTH = 16
+MAX_SUMMARY_LENGTH = 600
+EMOJI_PATTERN = rf"^[\s\S]{{0,{MAX_EMOJI_LENGTH}}}$"
+SUMMARY_PATTERN = rf"^[\s\S]{{0,{MAX_SUMMARY_LENGTH}}}$"
+
 # How many search_themes /news samples per run (behaviour knob, not data).
 THEMES_PER_RUN = 2
 

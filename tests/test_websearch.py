@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace as NS
 
+from newsbot.config import SUMMARY_PATTERN
 from newsbot.websearch import (
     _parse_published_date,
     _results_to_items,
@@ -65,6 +66,8 @@ def test_web_search_uses_openai_responses_web_search(monkeypatch):
     assert calls[0]["tools"] == [{"type": "web_search", "search_context_size": "medium"}]
     assert calls[0]["include"] == ["web_search_call.action.sources"]
     assert calls[0]["text"]["format"]["type"] == "json_schema"
+    properties = calls[0]["text"]["format"]["schema"]["properties"]["items"]["items"]["properties"]
+    assert properties["summary"]["pattern"] == SUMMARY_PATTERN
 
 
 def test_source_name_uses_known_label_else_netloc():
