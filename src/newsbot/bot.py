@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-from .config import daily_news_enabled
+from .config import daily_news_enabled, load_config, web_search_enabled
 from .dedup import mark_seen
 from .pipeline import collect_new_items
 from .render import summarize
@@ -64,6 +64,34 @@ async def _send(send, entries):
 
 FETCH_FAILED_MESSAGE = "⚠️ Failed to fetch the news. Please try again later."
 
+
+def _authorized_chat(update):
+    chat = update.effective_chat
+    return chat is not None and str(chat.id) == os.environ.get("CHAT_ID", "").strip()
+
+
+def _status_text():
+    try:
+        config = load_config()
+        sources = config["sources"]
+        if not isinstance(sources, list):
+            raise TypeError("sources must be a list")
+        feed_status = str(len(sources))
+    except (OSError, TypeError, ValueError, KeyError):
+        feed_status = "Configuration error"
+
+    daily_enabled = daily_news_enabled()
+    web_enabled = web_search_enabled()
+    schedule = "08:00 America/New_York" if daily_enabled else "disabled"
+    return "\n".join([
+        "News bot status",
+        f"Daily news: {'enabled' if daily_enabled else 'disabled'}",
+        f"Web search: {'enabled' if web_enabled else 'disabled (RSS only)'}",
+        f"RSS feeds: {feed_status}",
+        f"Schedule: {schedule}",
+    ])
+
+
 async def _fetch_and_summarize(include_themes=False):
     """Run collect_new_items()/summarize() in a worker thread (blocking network +
     multi-second API calls; offloaded so the event loop stays responsive —
@@ -79,8 +107,7 @@ async def _fetch_and_summarize(include_themes=False):
         return None, None
 
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    if chat is None or str(chat.id) != os.environ.get("CHAT_ID", "").strip():
+    if not _authorized_chat(update):
         logger.warning("Rejected /news from unauthorized chat")
         return
 
@@ -90,6 +117,14 @@ async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(FETCH_FAILED_MESSAGE)
         return
     await _send(update.message.reply_text, entries)
+
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _authorized_chat(update):
+        logger.warning("Rejected /status from unauthorized chat")
+        return
+    await update.message.reply_text(_status_text())
+
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
     chat_id = os.environ["CHAT_ID"]
@@ -123,6 +158,7 @@ def main():
         .build()
     )
     app.add_handler(CommandHandler("news", news_command))
+    app.add_handler(CommandHandler("status", status_command))
     app.add_error_handler(on_error)
 
     # Run daily at 08:00 US/Eastern (unless disabled via DAILY_NEWS). The time
