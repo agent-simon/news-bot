@@ -79,6 +79,11 @@ async def _fetch_and_summarize(include_themes=False):
         return None, None
 
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if chat is None or str(chat.id) != os.environ.get("CHAT_ID", "").strip():
+        logger.warning("Rejected /news from unauthorized chat")
+        return
+
     await update.message.reply_text("Fetching news...")
     items, entries = await _fetch_and_summarize(include_themes=True)
     if items is None:
