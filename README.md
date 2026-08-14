@@ -178,6 +178,19 @@ empty arrays and objects. Copy it to the local path and fill in that file:
 cp sources.shadow.json sources.local.json
 ```
 
+For example, a minimal configuration could look like this:
+
+```json
+{
+  "sources": [
+    {"url": "https://example.com/feed.xml", "limit": 3, "name": "Example News"}
+  ],
+  "known_source_names": {"example.com": "Example News"},
+  "base_topics": ["software testing"],
+  "search_themes": ["AI developer tools"]
+}
+```
+
 Edit the local file to change feeds and topics without committing personal
 configuration.
 Each `sources` entry has a feed `url`, a `limit` on how many items to consider per
