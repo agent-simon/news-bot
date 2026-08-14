@@ -56,7 +56,7 @@ if [[ ! -f "$APP_DIR/.env" ]]; then
 fi
 
 # Seed the local feed/topic config without overwriting an operator's edits.
-SOURCE_FILE="$APP_DIR/src/newsbot/sources.json"
+SOURCE_FILE="$APP_DIR/sources.local.json"
 if [[ ! -f "$SOURCE_FILE" ]]; then
     install -m 0644 -o "$APP_USER" -g "$APP_USER" \
         "$APP_DIR/sources.shadow.json" "$SOURCE_FILE"
