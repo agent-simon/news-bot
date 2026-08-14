@@ -20,7 +20,6 @@ export PATH="$HOME/.local/bin:$PATH"
 cd "$(dirname "$0")/.."
 
 SOURCE_FILE="sources.local.json"
-LEGACY_SOURCE_FILE="src/newsbot/sources.json"
 SOURCE_TEMPLATE="sources.shadow.json"
 
 # `git merge --ff-only` below rewrites this very file, and bash may continue
@@ -51,15 +50,11 @@ if [ -z "${AUTO_DEPLOY_APPLY:-}" ]; then
         UNIT_CHANGED=1
     fi
 
-    # Preserve a customized local config across the migration. Older checkouts
-    # may still have the previously tracked src/newsbot/sources.json.
+    # Preserve a customized local config across the update.
     SOURCE_BACKUP=
     if [ -f "$SOURCE_FILE" ]; then
         SOURCE_BACKUP="$(mktemp)"
         cp "$SOURCE_FILE" "$SOURCE_BACKUP"
-    elif [ -f "$LEGACY_SOURCE_FILE" ]; then
-        SOURCE_BACKUP="$(mktemp)"
-        cp "$LEGACY_SOURCE_FILE" "$SOURCE_BACKUP"
     fi
 
     git merge --ff-only origin/main
