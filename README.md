@@ -38,6 +38,7 @@ uv run news-bot
 legacy `uv run python bot.py` via a thin root shim.)
 
 - Send `/news` to the bot for an on-demand summary of new items.
+- Send `/status` to see feature flags, RSS feed count, and schedule status.
 - A daily summary is automatically sent to `CHAT_ID` at 08:00 US/Eastern time.
 
 Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`make sync`, `make run`, `make pi-stop`/`pi-start`/`pi-status`/`pi-logs`, `make deploy`).
