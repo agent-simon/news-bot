@@ -38,8 +38,15 @@ uv run news-bot
 legacy `uv run python bot.py` via a thin root shim.)
 
 - Send `/news` to the bot for an on-demand summary of new items.
-- Send `/status` to see feature flags, RSS feed count, and schedule status.
+- Send `/status` to see feature flags, RSS feed count, and schedule status. It is
+  read-only and does not call RSS feeds or OpenAI.
 - A daily summary is automatically sent to `CHAT_ID` at 08:00 US/Eastern time.
+
+`/news` and `/status` only respond in the chat identified by `CHAT_ID`. The
+status response reports whether daily news and web search are enabled, the
+number of configured RSS feeds, and the scheduled delivery time. If the source
+configuration cannot be read, it reports `Configuration error` for the feed
+count instead of failing silently.
 
 Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`make sync`, `make run`, `make pi-stop`/`pi-start`/`pi-status`/`pi-logs`, `make deploy`).
 
