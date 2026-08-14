@@ -20,6 +20,13 @@ cp .shadow.env .env
 - `OPENAI_API_KEY` — OpenAI API key
 - `CHAT_ID` — Telegram chat ID to receive the daily summary
 
+Optional settings in `.env`:
+
+- `DAILY_NEWS` — set to `off`, `false`, `0`, `no`, or `disabled` to disable the scheduled post; `/news` remains available. Defaults to enabled.
+- `WEB_SEARCH` — set to `off`, `false`, `0`, `no`, or `disabled` to use RSS feeds only. Defaults to enabled.
+- `SOURCES_PATH` — path to an alternate feed/topic JSON file, useful for untracked local configuration. The file is read fresh on each run.
+- `PI_HOST` — `user@host` SSH target used by the `scripts/pi-*.sh` helpers.
+
 ## Running
 
 ```bash
@@ -31,7 +38,7 @@ uv run news-bot
 legacy `uv run python bot.py` via a thin root shim.)
 
 - Send `/news` to the bot for an on-demand summary of new items.
-- A daily summary is automatically sent to `CHAT_ID` at 08:00 server time.
+- A daily summary is automatically sent to `CHAT_ID` at 08:00 US/Eastern time.
 
 Common tasks are also wrapped in a `Makefile` — run `make` to list targets (`make sync`, `make run`, `make pi-stop`/`pi-start`/`pi-status`/`pi-logs`, `make deploy`).
 
@@ -98,7 +105,7 @@ sudo systemctl restart news-bot.service
 Notes:
 - **`WorkingDirectory=/opt/news-bot` is load-bearing** — `.env` and the `seen_links.db` dedup store are resolved relative to it.
 - `seen_links.db` (and a legacy `seen_links.json`) are runtime state, written to `WorkingDirectory`; they're gitignored.
-- The daily job fires at **08:00 server time** — check the host timezone with `timedatectl`.
+- The daily job fires at **08:00 US/Eastern time** (with daylight-saving changes handled automatically).
 - No system packages are required beyond the venv: `sqlite3` is part of the Python standard library.
 
 ## Auto-deploy
@@ -151,6 +158,6 @@ To develop locally without disrupting the Pi, either:
 
 ## Configuration
 
-RSS/Atom sources and search topics live in [`src/newsbot/sources.json`](src/newsbot/sources.json) (edit feeds and topics there). Each `sources` entry has a feed `url`, a `limit` on how many items to consider per run, and a display `name`. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`, a SQLite store) are skipped. Links are committed as seen only after the summary is successfully delivered, so a failed run re-surfaces its items next time.
+RSS/Atom sources and search topics live in [`src/newsbot/sources.json`](src/newsbot/sources.json) (edit feeds and topics there). Each `sources` entry has a feed `url`, a `limit` on how many items to consider per run, and a display `name`. Set `SOURCES_PATH` to use an alternate JSON file without changing the tracked configuration. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`, a SQLite store) are skipped. Links are committed as seen only after the summary is successfully delivered, so a failed run re-surfaces its items next time.
 
 In addition to the RSS sources, OpenAI performs its own web search each run (`search_web()`) over the `base_topics` from `sources.json` to find recent items on the same topics, which are merged in before summarizing. On the on-demand `/news` command it also mixes in a random sample of `search_themes` for variety.
