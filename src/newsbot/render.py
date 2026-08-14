@@ -6,10 +6,17 @@ import html
 import json
 import logging
 
+from .config import EMOJI_PATTERN, MAX_EMOJI_LENGTH, MAX_SUMMARY_LENGTH, SUMMARY_PATTERN
 from .llm import SUMMARY_MODEL, get_client, response_text
 from .parsing import coerce_index, extract_json
 
 logger = logging.getLogger(__name__)
+
+
+def _truncate(value, limit):
+    if len(value) <= limit:
+        return value
+    return f"{value[:limit - 1].rstrip()}…"
 
 
 def _render(items, enrichments):
@@ -21,8 +28,14 @@ def _render(items, enrichments):
     entries = [{"text": f"📰 <b>{len(items)} new item(s)</b>", "links": []}]
     for idx, item in enumerate(items):
         enr = enrichments.get(idx, {})
-        emoji = html.escape(enr.get("emoji") or "🔹")
-        summary = html.escape(enr.get("summary") or item["summary"] or "")
+        emoji_value = enr.get("emoji")
+        if not isinstance(emoji_value, str) or not emoji_value or len(emoji_value) > MAX_EMOJI_LENGTH:
+            emoji_value = "🔹"
+        emoji = html.escape(emoji_value)
+        summary_value = enr.get("summary") or item["summary"] or ""
+        if not isinstance(summary_value, str):
+            summary_value = str(summary_value)
+        summary = html.escape(_truncate(summary_value, MAX_SUMMARY_LENGTH))
         title = html.escape(item["title"])
         link = item["link"]
         source = html.escape(item.get("source", ""))
@@ -81,8 +94,8 @@ def summarize(items):
                                 "type": "object",
                                 "properties": {
                                     "i": {"type": "integer", "minimum": 0},
-                                    "emoji": {"type": "string"},
-                                    "summary": {"type": "string"},
+                                    "emoji": {"type": "string", "pattern": EMOJI_PATTERN},
+                                    "summary": {"type": "string", "pattern": SUMMARY_PATTERN},
                                 },
                                 "required": ["i", "emoji", "summary"],
                                 "additionalProperties": False,
