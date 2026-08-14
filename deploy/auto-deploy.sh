@@ -19,6 +19,9 @@ export PATH="$HOME/.local/bin:$PATH"
 
 cd "$(dirname "$0")/.."
 
+SOURCE_FILE="src/newsbot/sources.json"
+SOURCE_TEMPLATE="sources.shadow.json"
+
 # `git merge --ff-only` below rewrites this very file, and bash may continue
 # executing stale (pre-merge) content for the rest of this process. Re-exec
 # after merging so the remaining steps run from the freshly-merged script.
@@ -47,8 +50,26 @@ if [ -z "${AUTO_DEPLOY_APPLY:-}" ]; then
         UNIT_CHANGED=1
     fi
 
+    # Preserve a customized tracked sources.json across the migration to the
+    # ignored local file. Fresh installs fall back to sources.shadow.json below.
+    SOURCE_BACKUP=
+    if [ -f "$SOURCE_FILE" ]; then
+        SOURCE_BACKUP="$(mktemp)"
+        cp "$SOURCE_FILE" "$SOURCE_BACKUP"
+    fi
+
     git merge --ff-only origin/main
-    exec env AUTO_DEPLOY_APPLY=1 AUTO_DEPLOY_UNIT_CHANGED="$UNIT_CHANGED" "$0"
+    exec env AUTO_DEPLOY_APPLY=1 AUTO_DEPLOY_UNIT_CHANGED="$UNIT_CHANGED" \
+        AUTO_DEPLOY_SOURCES_BACKUP="${SOURCE_BACKUP:-}" "$0"
+fi
+
+if [ -n "${AUTO_DEPLOY_SOURCES_BACKUP:-}" ]; then
+    if [ ! -f "$SOURCE_FILE" ]; then
+        cp "$AUTO_DEPLOY_SOURCES_BACKUP" "$SOURCE_FILE"
+    fi
+    rm -f "$AUTO_DEPLOY_SOURCES_BACKUP"
+elif [ ! -f "$SOURCE_FILE" ]; then
+    cp "$SOURCE_TEMPLATE" "$SOURCE_FILE"
 fi
 
 uv sync
