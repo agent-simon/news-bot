@@ -59,7 +59,7 @@ fi
 SOURCE_FILE="$APP_DIR/src/newsbot/sources.json"
 if [[ ! -f "$SOURCE_FILE" ]]; then
     install -m 0644 -o "$APP_USER" -g "$APP_USER" \
-        "$APP_DIR/src/newsbot/sources.shadow.json" "$SOURCE_FILE"
+        "$APP_DIR/sources.shadow.json" "$SOURCE_FILE"
 fi
 
 # 4. uv must be on a system-wide PATH so $APP_USER (not just you) can run it.

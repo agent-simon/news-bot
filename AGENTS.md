@@ -23,7 +23,7 @@
 
 - Copy `.shadow.env` to `.env`; `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, and `CHAT_ID` are required to run the bot.
 - `DAILY_NEWS` and `WEB_SEARCH` are enabled unless set to `off`, `false`, `0`, `no`, or `disabled`; `SOURCES_PATH` can point to an alternate feed/topic JSON file, which is read fresh on each run.
-- Edit the ignored `src/newsbot/sources.json` for local feeds/topics; `src/newsbot/sources.shadow.json` is the tracked template. Do not edit or commit `seen_links.db`/`seen_links.json`; they are runtime dedup state.
+- Edit the ignored `src/newsbot/sources.json` for local feeds/topics; the root-level `sources.shadow.json` is the empty tracked template. Do not edit or commit `seen_links.db`/`seen_links.json`; they are runtime dedup state.
 - Items are marked seen only after their Telegram chunk is delivered, so do not move dedup marking earlier without preserving retry behavior.
 
 ## Architecture Details

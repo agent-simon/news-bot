@@ -20,7 +20,7 @@ export PATH="$HOME/.local/bin:$PATH"
 cd "$(dirname "$0")/.."
 
 SOURCE_FILE="src/newsbot/sources.json"
-SOURCE_TEMPLATE="src/newsbot/sources.shadow.json"
+SOURCE_TEMPLATE="sources.shadow.json"
 
 # `git merge --ff-only` below rewrites this very file, and bash may continue
 # executing stale (pre-merge) content for the rest of this process. Re-exec
