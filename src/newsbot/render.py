@@ -21,7 +21,7 @@ def _render(items, enrichments):
     entries = [{"text": f"📰 <b>{len(items)} new item(s)</b>", "links": []}]
     for idx, item in enumerate(items):
         enr = enrichments.get(idx, {})
-        emoji = enr.get("emoji") or "🔹"
+        emoji = html.escape(enr.get("emoji") or "🔹")
         summary = html.escape(enr.get("summary") or item["summary"] or "")
         title = html.escape(item["title"])
         link = item["link"]

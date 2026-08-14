@@ -20,6 +20,14 @@ def test_render_keeps_local_title_and_link():
     assert "Model" in entries[1]["text"]
 
 
+def test_render_escapes_model_emoji_html():
+    items = [{"title": "Title", "link": "", "summary": "Raw"}]
+    entries = _render(items, {0: {"emoji": "<b>injected</b>", "summary": "Model"}})
+
+    assert "&lt;b&gt;injected&lt;/b&gt;" in entries[1]["text"]
+    assert "<b>injected</b>" not in entries[1]["text"]
+
+
 def test_summarize_empty_does_not_call_client(monkeypatch):
     monkeypatch.setattr("newsbot.render.get_client", lambda: (_ for _ in ()).throw(AssertionError()))
     assert summarize([]) == [{"text": "📰 No new relevant items today.", "links": []}]
