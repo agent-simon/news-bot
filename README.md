@@ -25,7 +25,7 @@ Optional settings in `.env`:
 - `DAILY_NEWS` — set to `off`, `false`, `0`, `no`, or `disabled` to disable the scheduled post; `/news` remains available. Defaults to enabled.
 - `WEB_SEARCH` — set to `off`, `false`, `0`, `no`, or `disabled` to use RSS feeds only. Defaults to enabled.
 - `SOURCES_PATH` — path to an alternate feed/topic JSON file. The default local
-  config is `src/newsbot/sources.json`, seeded from the tracked root-level
+  config is the root-level `sources.local.json`, seeded from the tracked
   `sources.shadow.json`; copy and fill in the local file before running the bot.
   The file is read fresh on each run.
 - `PI_HOST` — `user@host` SSH target used by the `scripts/pi-*.sh` helpers.
@@ -170,12 +170,12 @@ To develop locally without disrupting the Pi, either:
 ## Configuration
 
 RSS/Atom sources and search topics live in the local, ignored
-[`src/newsbot/sources.json`](src/newsbot/sources.json), seeded from the tracked
-root-level [`sources.shadow.json`](sources.shadow.json). The template contains
+[`sources.local.json`](sources.local.json), seeded from the tracked
+[`sources.shadow.json`](sources.shadow.json). The template contains
 empty arrays and objects. Copy it to the local path and fill in that file:
 
 ```bash
-cp sources.shadow.json src/newsbot/sources.json
+cp sources.shadow.json sources.local.json
 ```
 
 Edit the local file to change feeds and topics without committing personal

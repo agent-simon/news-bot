@@ -48,12 +48,11 @@ def daily_news_enabled():
 
 
 def config_path():
-    """Path to the feed/topic config: SOURCES_PATH if set, else the local
-    module-relative sources.json (CWD-independent). The local file is seeded from
-    root-level sources.shadow.json during installation and is intentionally
-    untracked."""
+    """Path to the feed/topic config: SOURCES_PATH if set, else the root-level
+    local sources.local.json. The local file is seeded from sources.shadow.json
+    during installation and is intentionally untracked."""
     return os.environ.get("SOURCES_PATH", "").strip() or os.path.join(
-        os.path.dirname(__file__), "sources.json"
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "sources.local.json"
     )
 
 

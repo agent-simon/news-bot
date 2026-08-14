@@ -23,13 +23,13 @@
 
 - Copy `.shadow.env` to `.env`; `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, and `CHAT_ID` are required to run the bot.
 - `DAILY_NEWS` and `WEB_SEARCH` are enabled unless set to `off`, `false`, `0`, `no`, or `disabled`; `SOURCES_PATH` can point to an alternate feed/topic JSON file, which is read fresh on each run.
-- Edit the ignored `src/newsbot/sources.json` for local feeds/topics; the root-level `sources.shadow.json` is the empty tracked template. Do not edit or commit `seen_links.db`/`seen_links.json`; they are runtime dedup state.
+- Edit the ignored root-level `sources.local.json` for local feeds/topics; `sources.shadow.json` is the empty tracked template. Do not edit or commit `seen_links.db`/`seen_links.json`; they are runtime dedup state.
 - Items are marked seen only after their Telegram chunk is delivered, so do not move dedup marking earlier without preserving retry behavior.
 
 ## Architecture Details
 
 - `bot.py` registers `/news` and the optional daily 08:00 US/Eastern job, then collects, summarizes, chunks, and sends messages.
-- `config.py` reads environment flags and the feed/topic JSON on each call; `SOURCES_PATH` overrides the package-relative local `sources.json`.
+- `config.py` reads environment flags and the feed/topic JSON on each call; `SOURCES_PATH` overrides the default root-level `sources.local.json`.
 - `rss.py` reads configured feeds without persisting dedup state; `websearch.py` performs one OpenAI web-search pass and filters invented or stale links.
 - `pipeline.py` deduplicates RSS and web-search candidates; `render.py` keeps titles and links local while OpenAI supplies emoji and summaries.
 - `dedup.py` stores normalized seen links in SQLite with 14-day retention and migrates legacy `seen_links.json` on first connection.

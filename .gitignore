@@ -15,4 +15,3 @@ seen_links.db-*
 
 # Local feed/topic override (SOURCES_PATH) — edited in place, not version-controlled
 sources.local.json
-src/newsbot/sources.json
