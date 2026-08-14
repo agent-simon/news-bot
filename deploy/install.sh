@@ -55,6 +55,13 @@ if [[ ! -f "$APP_DIR/.env" ]]; then
     die "seeded $APP_DIR/.env — fill in TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, CHAT_ID, then re-run $0"
 fi
 
+# Seed the local feed/topic config without overwriting an operator's edits.
+SOURCE_FILE="$APP_DIR/src/newsbot/sources.json"
+if [[ ! -f "$SOURCE_FILE" ]]; then
+    install -m 0644 -o "$APP_USER" -g "$APP_USER" \
+        "$APP_DIR/src/newsbot/sources.shadow.json" "$SOURCE_FILE"
+fi
+
 # 4. uv must be on a system-wide PATH so $APP_USER (not just you) can run it.
 #    Probe root's PATH, then the admin user's login PATH (uv often lives in
 #    ~/.local/bin, which sudo's sanitised PATH can't see).

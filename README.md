@@ -24,7 +24,9 @@ Optional settings in `.env`:
 
 - `DAILY_NEWS` — set to `off`, `false`, `0`, `no`, or `disabled` to disable the scheduled post; `/news` remains available. Defaults to enabled.
 - `WEB_SEARCH` — set to `off`, `false`, `0`, `no`, or `disabled` to use RSS feeds only. Defaults to enabled.
-- `SOURCES_PATH` — path to an alternate feed/topic JSON file, useful for untracked local configuration. The file is read fresh on each run.
+- `SOURCES_PATH` — path to an alternate feed/topic JSON file. The default local
+  config is `src/newsbot/sources.json`, seeded from the tracked
+  `src/newsbot/sources.shadow.json`; the file is read fresh on each run.
 - `PI_HOST` — `user@host` SSH target used by the `scripts/pi-*.sh` helpers.
 
 ## Running
@@ -155,7 +157,7 @@ Telegram only allows **one active poller per bot token** — running the same bo
 
 To develop locally without disrupting the Pi, either:
 
-- **Use a separate dev bot** — create a second bot via [@BotFather](https://t.me/BotFather), and in your local `.env` set `TELEGRAM_BOT_TOKEN` to its token. You can reuse the same `CHAT_ID` (add the dev bot to that chat) or point `CHAT_ID` at a separate test chat. `OPENAI_API_KEY` and `sources.json` can stay the same — only the bot identity differs.
+- **Use a separate dev bot** — create a second bot via [@BotFather](https://t.me/BotFather), and in your local `.env` set `TELEGRAM_BOT_TOKEN` to its token. You can reuse the same `CHAT_ID` (add the dev bot to that chat) or point `CHAT_ID` at a separate test chat. `OPENAI_API_KEY` and the local sources config can stay the same — only the bot identity differs.
 - **Stop the Pi's bot while you work** — [`scripts/pi-bot.sh`](scripts/pi-bot.sh) SSHes into the Pi to stop/start/restart `news-bot.service`:
   ```bash
   scripts/pi-bot.sh stop      # before running locally with the same token
@@ -166,6 +168,18 @@ To develop locally without disrupting the Pi, either:
 
 ## Configuration
 
-RSS/Atom sources and search topics live in [`src/newsbot/sources.json`](src/newsbot/sources.json) (edit feeds and topics there). Each `sources` entry has a feed `url`, a `limit` on how many items to consider per run, and a display `name`. Set `SOURCES_PATH` to use an alternate JSON file without changing the tracked configuration. Items older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`, a SQLite store) are skipped. Links are committed as seen only after the summary is successfully delivered, so a failed run re-surfaces its items next time.
+RSS/Atom sources and search topics live in the local, ignored
+[`src/newsbot/sources.json`](src/newsbot/sources.json), seeded from the tracked
+[`src/newsbot/sources.shadow.json`](src/newsbot/sources.shadow.json). Edit the
+local file to change feeds and topics without committing personal configuration.
+Each `sources` entry has a feed `url`, a `limit` on how many items to consider per
+run, and a display `name`. Set `SOURCES_PATH` to use another JSON file. Items
+older than `MAX_AGE_DAYS` (default 3) or already seen (tracked in `seen_links.db`,
+a SQLite store) are skipped. Links are committed as seen only after the summary
+is successfully delivered, so a failed run re-surfaces its items next time.
 
-In addition to the RSS sources, OpenAI performs its own web search each run (`search_web()`) over the `base_topics` from `sources.json` to find recent items on the same topics, which are merged in before summarizing. On the on-demand `/news` command it also mixes in a random sample of `search_themes` for variety.
+In addition to the RSS sources, OpenAI performs its own web search each run
+(`search_web()`) over the `base_topics` from the local sources config to find
+recent items on the same topics, which are merged in before summarizing. On the
+on-demand `/news` command it also mixes in a random sample of `search_themes` for
+variety.
