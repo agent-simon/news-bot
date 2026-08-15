@@ -9,12 +9,19 @@ from openai import OpenAI
 # smaller, lower-cost task.
 SEARCH_MODEL = "gpt-5.5"
 SUMMARY_MODEL = "gpt-5.4-mini"
+OPENAI_TIMEOUT_SECONDS = 60.0
+OPENAI_MAX_RETRIES = 2
 
 
 @lru_cache(maxsize=1)
 def get_client():
-    """The shared OpenAI client, built on first use and reused thereafter."""
-    return OpenAI()
+    """The shared OpenAI client, built on first use and reused thereafter.
+
+    The SDK retries transient connection, timeout, rate-limit, and server
+    errors. Keep both the timeout and retry count bounded so a broken network
+    cannot hold up a bot run indefinitely.
+    """
+    return OpenAI(timeout=OPENAI_TIMEOUT_SECONDS, max_retries=OPENAI_MAX_RETRIES)
 
 
 def response_text(response):
