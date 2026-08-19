@@ -20,6 +20,8 @@ load_dotenv()
 
 # Telegram rejects messages longer than 4096 chars; stay safely under it.
 TELEGRAM_LIMIT = 4000
+_news_run_lock = asyncio.Lock()
+NEWS_BUSY_MESSAGE = "A news run is already in progress. Please try again shortly."
 
 def _chunks(entries, limit=TELEGRAM_LIMIT):
     """Group rendered entries ({text, links}) into Telegram-sized pieces on
@@ -106,17 +108,44 @@ async def _fetch_and_summarize(include_themes=False):
         logger.exception("Failed to fetch/summarize news")
         return None, None
 
+
+async def _run_news(send, *, include_themes=False, started_text=None):
+    """Run one complete news collection, rendering, and delivery cycle.
+
+    The lock is acquired before any collection starts and released only after
+    delivery (including post-send deduplication) finishes. The lock check and
+    acquire have no intervening await, so competing tasks on this event loop
+    cannot both enter the workflow.
+    """
+    if _news_run_lock.locked():
+        return False
+
+    await _news_run_lock.acquire()
+    try:
+        if started_text:
+            await send(started_text)
+        items, entries = await _fetch_and_summarize(include_themes=include_themes)
+        if items is None:
+            await send(FETCH_FAILED_MESSAGE)
+            return False
+        await _send(send, entries)
+        return True
+    finally:
+        _news_run_lock.release()
+
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _authorized_chat(update):
         logger.warning("Rejected /news from unauthorized chat")
         return
 
-    await update.message.reply_text("Fetching news...")
-    items, entries = await _fetch_and_summarize(include_themes=True)
-    if items is None:
-        await update.message.reply_text(FETCH_FAILED_MESSAGE)
+    if _news_run_lock.locked():
+        await update.message.reply_text(NEWS_BUSY_MESSAGE)
         return
-    await _send(update.message.reply_text, entries)
+    await _run_news(
+        update.message.reply_text,
+        include_themes=True,
+        started_text="Fetching news...",
+    )
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -128,11 +157,14 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
     chat_id = os.environ["CHAT_ID"]
-    items, entries = await _fetch_and_summarize()
-    if items is None:
-        await context.bot.send_message(chat_id=chat_id, text=FETCH_FAILED_MESSAGE)
+
+    async def send(text, **kw):
+        return await context.bot.send_message(chat_id=chat_id, text=text, **kw)
+
+    if _news_run_lock.locked():
+        logger.info("Skipping scheduled news run because another run is in progress")
         return
-    await _send(lambda text, **kw: context.bot.send_message(chat_id=chat_id, text=text, **kw), entries)
+    await _run_news(send)
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     # Log transient errors (e.g. telegram.error.TimedOut on a flaky link)
